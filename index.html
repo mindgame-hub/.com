@@ -293,7 +293,16 @@
             font-weight: bold;
         }
 
-        .bingo-cell:hover {
+        .bingo-cell.not-called {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .bingo-cell.not-called:hover {
+            background: white;
+        }
+
+        .bingo-cell:hover:not(.not-called) {
             background: #f0f0f0;
         }
 
@@ -609,12 +618,20 @@
             });
         }
 
-        // Mark Number
+        // Mark Number - Only if it has been called
         function markNumber(row, col) {
             if (gameState.status === 'completed') return;
 
             const player = gameState.players.find(p => p.id === currentPlayerId);
             if (!player) return;
+
+            const number = player.card[col][row];
+            
+            // Check if the number has been called
+            if (!gameState.calledNumbers.includes(number) && number !== 0) {
+                alert('This number has not been called yet!');
+                return;
+            }
 
             player.marked[row][col] = true;
 
@@ -669,11 +686,15 @@
                         const marked = player.marked[row][col];
                         const isFree = number === 0;
                         const isCurrentPlayer = player.id === currentPlayerId;
+                        
+                        // Check if number has been called (or is FREE space)
+                        const isCalled = gameState.calledNumbers.includes(number) || isFree;
+                        const isNotCalled = !isCalled && isCurrentPlayer;
 
                         html += `
                             <div 
-                                class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''}"
-                                ${isCurrentPlayer ? `onclick="markNumber(${row}, ${col})"` : ''}
+                                class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''} ${isNotCalled ? 'not-called' : ''}"
+                                ${isCurrentPlayer && !isNotCalled ? `onclick="markNumber(${row}, ${col})"` : ''}
                             >
                                 ${isFree ? 'FREE' : number}
                             </div>
