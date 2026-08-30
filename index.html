@@ -184,6 +184,13 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         .current-number button {
             background: white;
             color: #667eea;
@@ -204,6 +211,27 @@
         .current-number button:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+
+        .sound-toggle {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .sound-toggle.muted {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .sound-toggle:hover {
+            transform: translateY(-2px);
         }
 
         .game-status {
@@ -391,7 +419,10 @@
                         <div class="letter-badge" id="letterBadge">-</div>
                         <div class="number-display" id="currentNumber">-</div>
                     </div>
-                    <button onclick="callNextNumber()" id="callBtn">📢 Call Next Number</button>
+                    <div class="controls">
+                        <button onclick="callNextNumber()" id="callBtn">📢 Call Next Number</button>
+                        <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊 Sound ON</button>
+                    </div>
                 </div>
             </div>
 
@@ -414,9 +445,45 @@
         let gameState = null;
         let currentPlayerId = null;
         let gameId = null;
+        let soundEnabled = true;
 
         // Initialize game with in-memory storage
         const gameStorage = {};
+
+        // Text-to-Speech announcer
+        class Announcer {
+            static speak(text) {
+                if (!soundEnabled) return;
+
+                // Cancel any previous speech
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+
+                window.speechSynthesis.speak(utterance);
+            }
+
+            static announceNumber(letter, number) {
+                const text = `${letter}, ${number}`;
+                this.speak(text);
+            }
+        }
+
+        // Toggle sound
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundToggle');
+            if (soundEnabled) {
+                btn.textContent = '🔊 Sound ON';
+                btn.classList.remove('muted');
+            } else {
+                btn.textContent = '🔇 Sound OFF';
+                btn.classList.add('muted');
+            }
+        }
 
         // BingoEngine
         class BingoEngine {
@@ -584,6 +651,10 @@
 
             gameState.calledNumbers.push(nextNumber);
             gameState.currentNumber = nextNumber;
+
+            // Announce the number
+            const letter = BingoEngine.getLetterForNumber(nextNumber);
+            Announcer.announceNumber(letter, nextNumber);
 
             // Simulate bot responses
             simulateBotResponses(nextNumber);
