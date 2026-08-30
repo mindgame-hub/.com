@@ -1,6 +1,6 @@
 # Bingo Battle Royale
 
-Multiplayer bingo game with hidden expert-level AI opponents.
+Multiplayer bingo game 
 
 ## Setup
 
