@@ -138,27 +138,67 @@
         }
 
         .current-number {
-            background: #f0f0f0;
-            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
             border-radius: 8px;
             margin-bottom: 15px;
         }
 
         .current-number h3 {
-            color: #333;
+            color: white;
             margin-bottom: 10px;
             font-size: 18px;
         }
 
+        .announcer-display {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .letter-badge {
+            background: white;
+            color: #667eea;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .number-display {
+            background: white;
+            color: #667eea;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 32px;
+            font-weight: bold;
+            min-width: 80px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
         .current-number button {
-            background: #2196f3;
-            color: white;
+            background: white;
+            color: #667eea;
             border: none;
             padding: 10px 20px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
             font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .current-number button:hover:not(:disabled) {
+            background: #f0f0f0;
+            transform: translateY(-2px);
         }
 
         .current-number button:disabled {
@@ -337,7 +377,11 @@
             <div class="game-header">
                 <h2>🎮 Bingo Game</h2>
                 <div class="current-number">
-                    <h3>Called Number: <span id="currentNumber">Waiting...</span></h3>
+                    <h3>📢 Called Number</h3>
+                    <div class="announcer-display">
+                        <div class="letter-badge" id="letterBadge">-</div>
+                        <div class="number-display" id="currentNumber">-</div>
+                    </div>
                     <button onclick="callNextNumber()" id="callBtn">📢 Call Next Number</button>
                 </div>
             </div>
@@ -427,6 +471,17 @@
                     }
                 }
                 return null;
+            }
+
+            // Get the bingo letter for a number
+            static getLetterForNumber(number) {
+                const letters = ['B', 'I', 'N', 'G', 'O'];
+                if (number >= 1 && number <= 15) return letters[0];   // B: 1-15
+                if (number >= 16 && number <= 30) return letters[1];  // I: 16-30
+                if (number >= 31 && number <= 45) return letters[2];  // N: 31-45
+                if (number >= 46 && number <= 60) return letters[3];  // G: 46-60
+                if (number >= 61 && number <= 75) return letters[4];  // O: 61-75
+                return '-';
             }
         }
 
@@ -575,8 +630,12 @@
 
         // Render Game
         function renderGame() {
-            // Update current number
-            document.getElementById('currentNumber').textContent = gameState.currentNumber || 'Waiting...';
+            // Update current number and letter
+            const currentNum = gameState.currentNumber || '-';
+            const letter = gameState.currentNumber ? BingoEngine.getLetterForNumber(gameState.currentNumber) : '-';
+            
+            document.getElementById('currentNumber').textContent = currentNum;
+            document.getElementById('letterBadge').textContent = letter;
             document.getElementById('callBtn').disabled = gameState.status === 'completed';
 
             // Update status
@@ -634,7 +693,10 @@
 
             // Render called numbers
             const numbersList = document.getElementById('numbersList');
-            numbersList.innerHTML = gameState.calledNumbers.map(num => `<span class="number-badge">${num}</span>`).join('');
+            numbersList.innerHTML = gameState.calledNumbers.map(num => {
+                const letter = BingoEngine.getLetterForNumber(num);
+                return `<span class="number-badge">${letter} ${num}</span>`;
+            }).join('');
             document.getElementById('calledCount').textContent = gameState.calledNumbers.length;
         }
     </script>
