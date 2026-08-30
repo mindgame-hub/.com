@@ -251,6 +251,16 @@
         .winner-text {
             color: #d4af37;
             font-size: 18px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
         }
 
         .players-grid {
@@ -348,6 +358,16 @@
             border-radius: 4px;
             font-weight: bold;
             font-size: 12px;
+            animation: bounce 0.6s;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
         }
 
         .called-numbers {
@@ -468,6 +488,11 @@
 
             static announceNumber(letter, number) {
                 const text = `${letter}, ${number}`;
+                this.speak(text);
+            }
+
+            static announceBingo(winnerName) {
+                const text = `Bingo! The winner is ${winnerName}!`;
                 this.speak(text);
             }
         }
@@ -679,6 +704,8 @@
                                     if (gameState.status !== 'completed') {
                                         gameState.status = 'completed';
                                         gameState.winner = player;
+                                        // Announce the winner
+                                        Announcer.announceBingo(player.name);
                                     }
                                 }
                                 renderGame();
@@ -711,6 +738,8 @@
                 player.score += 10;
                 gameState.status = 'completed';
                 gameState.winner = player;
+                // Announce the winner
+                Announcer.announceBingo(player.name);
             }
 
             renderGame();
