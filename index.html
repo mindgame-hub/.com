@@ -170,6 +170,18 @@
             font-size: 28px;
             font-weight: bold;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .number-display {
@@ -182,6 +194,7 @@
             min-width: 80px;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            animation: popIn 0.3s ease-out;
         }
 
         .controls {
@@ -324,6 +337,16 @@
             background: #4caf50;
             color: white;
             border-color: #45a049;
+            animation: markAnimation 0.3s ease-out;
+        }
+
+        @keyframes markAnimation {
+            0% {
+                transform: scale(0.9);
+            }
+            100% {
+                transform: scale(1);
+            }
         }
 
         .bingo-cell.free {
@@ -340,7 +363,7 @@
             background: white;
         }
 
-        .bingo-cell:hover:not(.not-called) {
+        .bingo-cell:hover:not(.not-called):not(.marked) {
             background: #f0f0f0;
         }
 
@@ -423,6 +446,7 @@
                 <ul>
                     <li>✓ You'll be matched with other players</li>
                     <li>✓ Numbers are called randomly</li>
+                    <li>✓ Numbers auto-mark on your card!</li>
                     <li>✓ First to get 5 in a row wins!</li>
                     <li>✓ Win: 10 points | Runner-up: 5 points</li>
                 </ul>
@@ -681,68 +705,34 @@
             const letter = BingoEngine.getLetterForNumber(nextNumber);
             Announcer.announceNumber(letter, nextNumber);
 
-            // Simulate bot responses
-            simulateBotResponses(nextNumber);
+            // Auto-mark the number on all players' cards
+            markNumberOnAllCards(nextNumber);
 
             renderGame();
         }
 
-        // Simulate Bot Responses
-        function simulateBotResponses(calledNumber) {
+        // Auto-mark number on all players' cards
+        function markNumberOnAllCards(calledNumber) {
             gameState.players.forEach(player => {
-                if (player.role === 'bot' && player.bot) {
-                    setTimeout(() => {
-                        if (player.bot.shouldMarkNumber(player.card, calledNumber)) {
-                            const pos = BingoEngine.findNumberPosition(player.card, calledNumber);
-                            if (pos) {
-                                const [row, col] = pos;
-                                player.marked[row][col] = true;
+                // Find the position of the called number on this player's card
+                const pos = BingoEngine.findNumberPosition(player.card, calledNumber);
+                if (pos) {
+                    const [row, col] = pos;
+                    player.marked[row][col] = true;
 
-                                if (BingoEngine.checkWin(player.marked)) {
-                                    player.isWinner = true;
-                                    player.score += 10;
-                                    if (gameState.status !== 'completed') {
-                                        gameState.status = 'completed';
-                                        gameState.winner = player;
-                                        // Announce the winner
-                                        Announcer.announceBingo(player.name);
-                                    }
-                                }
-                                renderGame();
-                            }
+                    // Check if this player won
+                    if (BingoEngine.checkWin(player.marked)) {
+                        if (gameState.status === 'in-progress') {
+                            player.isWinner = true;
+                            player.score += 10;
+                            gameState.status = 'completed';
+                            gameState.winner = player;
+                            // Announce the winner
+                            Announcer.announceBingo(player.name);
                         }
-                    }, player.bot.getReactionDelay());
+                    }
                 }
             });
-        }
-
-        // Mark Number - Only if it has been called
-        function markNumber(row, col) {
-            if (gameState.status === 'completed') return;
-
-            const player = gameState.players.find(p => p.id === currentPlayerId);
-            if (!player) return;
-
-            const number = player.card[col][row];
-            
-            // Check if the number has been called
-            if (!gameState.calledNumbers.includes(number) && number !== 0) {
-                alert('This number has not been called yet!');
-                return;
-            }
-
-            player.marked[row][col] = true;
-
-            if (BingoEngine.checkWin(player.marked)) {
-                player.isWinner = true;
-                player.score += 10;
-                gameState.status = 'completed';
-                gameState.winner = player;
-                // Announce the winner
-                Announcer.announceBingo(player.name);
-            }
-
-            renderGame();
         }
 
         // Render Game
@@ -785,16 +775,10 @@
                         const number = player.card[col][row];
                         const marked = player.marked[row][col];
                         const isFree = number === 0;
-                        const isCurrentPlayer = player.id === currentPlayerId;
-                        
-                        // Check if number has been called (or is FREE space)
-                        const isCalled = gameState.calledNumbers.includes(number) || isFree;
-                        const isNotCalled = !isCalled && isCurrentPlayer;
 
                         html += `
                             <div 
-                                class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''} ${isNotCalled ? 'not-called' : ''}"
-                                ${isCurrentPlayer && !isNotCalled ? `onclick="markNumber(${row}, ${col})"` : ''}
+                                class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''}"
                             >
                                 ${isFree ? 'FREE' : number}
                             </div>
