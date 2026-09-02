@@ -12,7 +12,8 @@
         .lobby h1 { color:#333; margin-bottom:10px; font-size:24px; }
         .form-group { display:flex; gap:10px; align-items:center; margin:12px 0; }
         input[type=text], input[type=number] { padding:10px; border:2px solid #e0e0e0; border-radius:6px; }
-        .btn { padding:10px 14px; font-weight:bold; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; border:none; border-radius:6px; cursor:pointer; }
+        .btn { padding:10px 14px; font-weight:bold; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; border:none; border-radius:6px; cursor:pointer; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .rooms { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
         .room-card { border:1px solid #ddd; padding:12px; border-radius:8px; min-width:220px; }
@@ -33,13 +34,15 @@
         .bingo-cell.marked { background: #4CAF50; color: white; font-weight: bold; }
         .bingo-cell.free { background: #FFD700; font-weight: bold; }
         .winner-badge { background: gold; color: red; padding: 8px; border-radius: 4px; margin-top: 8px; font-weight: bold; text-align: center; }
+        .info-text { background: #fffacd; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 12px; }
+        .timer { font-weight: bold; color: #d9534f; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="lobby" class="lobby">
             <h1>🎮 Bingo Battle Royale — Lobby</h1>
-            <p style="color:#666;">Create or join rooms. Room capacity default 15. Owner can start the game any time.</p>
+            <p style="color:#666;">Create or join rooms. Max 15 players per room. Rooms auto-fill with bots. Rooms close 15 min after game starts.</p>
 
             <div style="display:flex; gap:12px; align-items:center; margin-top:12px;">
                 <div class="form-group">
@@ -54,7 +57,6 @@
             <div style="margin-top:14px; display:flex; gap:12px; align-items:center;">
                 <div class="form-group">
                     <input id="newRoomName" type="text" placeholder="Room name" />
-                    <input id="newRoomMax" type="number" value="15" min="2" max="50" style="width:80px;" />
                     <button class="btn" id="createRoomBtn">Create Room</button>
                 </div>
             </div>
@@ -66,8 +68,9 @@
                 <strong>Notes:</strong>
                 <ul>
                     <li>• Rooms persist locally (localStorage). Clearing browser storage removes them.</li>
-                    <li>• Empty slots are filled with single-word Bisaya bot names; joining replaces a bot slot.</li>
-                    <li>• Owner can start the game even if the room is not full; bots fill empty slots when starting.</li>
+                    <li>• Max 15 players per room. Empty slots auto-fill with Bisaya bots.</li>
+                    <li>• Owner can start anytime (full or not). Bots join to fill empty slots.</li>
+                    <li>• Rooms auto-close and remove 15 minutes after game starts.</li>
                 </ul>
             </div>
         </div>
@@ -92,7 +95,11 @@
                             <button id="soundToggle" class="btn" onclick="toggleSound()">🔊 Sound ON</button>
                             <button id="startBtn" class="btn" onclick="startSelectedRoom()">▶️ Start Game</button>
                         </div>
-                        <div class="status"><span id="roomStatus">Status: -</span><br><span id="ownerStatus" style="font-size:12px; color:#666;"></span></div>
+                        <div class="status">
+                            <span id="roomStatus">Status: -</span><br>
+                            <span id="ownerStatus" style="font-size:12px; color:#666;"></span><br>
+                            <span id="timerDisplay" class="timer"></span>
+                        </div>
                     </div>
 
                     <div class="called-numbers">
@@ -102,7 +109,7 @@
                 </div>
 
                 <div style="width:420px;">
-                    <h4>Players</h4>
+                    <h4>Players (<span id="playerCount">0</span>/15)</h4>
                     <div id="playersGrid" class="players-grid"></div>
                 </div>
             </div>
@@ -112,13 +119,15 @@
     <script>
         // === Configuration and State ===
         const STORAGE_KEY = 'bingo_rooms_v1';
-        const DEFAULT_MAX = 15;
-        let rooms = []; // array of room objects
+        const MAX_PLAYERS = 15;
+        const ROOM_EXPIRY_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+        let rooms = [];
         let currentRoomId = null;
-        let currentPlayerId = null; // if joined as human
+        let currentPlayerId = null;
         let soundEnabled = true;
+        let timerInterval = null;
 
-        // Bisaya single-word bot names (no family names)
+        // Bisaya single-word bot names
         const bisayaBotNames = ['Inday','Dodong','Jun','Nonoy','Boyet','Mayang','Ligaya','Amihan','Datu','Kulas','Oneng','Nene','Toto','Pipoy','Rex','Mels','Tala','Luna','Dina','Lito'];
 
         function saveRooms() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms)); } catch(e){} }
@@ -138,11 +147,23 @@
             };
         }
 
-        function createRoom(name, maxPlayers, ownerId, ownerName) {
+        function createRoom(name, ownerId, ownerName) {
             const id = generateId('room');
             const players = [];
-            for (let i=0;i<maxPlayers;i++) players.push(createBot(i));
-            const room = { id, name: name || 'Room '+id.slice(-4), ownerId: ownerId || null, ownerName: ownerName || null, maxPlayers: maxPlayers || DEFAULT_MAX, status: 'waiting', players, calledNumbers: [], currentNumber: null, winner: null };
+            for (let i=0; i<MAX_PLAYERS; i++) players.push(createBot(i));
+            const room = { 
+                id, 
+                name: name || 'Room '+id.slice(-4), 
+                ownerId, 
+                ownerName, 
+                maxPlayers: MAX_PLAYERS, 
+                status: 'waiting', 
+                players, 
+                calledNumbers: [], 
+                currentNumber: null, 
+                winner: null,
+                startedAt: null
+            };
             rooms.push(room);
             saveRooms();
             renderRoomsList();
@@ -151,16 +172,26 @@
 
         function findRoom(id){ return rooms.find(r=>r.id===id); }
 
-        // Replace first bot with human when joining
         function joinRoom(roomId, playerName) {
-            const room = findRoom(roomId); if(!room) return false;
+            const room = findRoom(roomId); 
+            if(!room) return false;
             const botIndex = room.players.findIndex(p=>p.role==='bot');
             if (botIndex === -1) return false;
             currentPlayerId = 'player-' + Math.random().toString(36).substring(7);
-            const human = { id: currentPlayerId, name: playerName || ('Player-'+currentPlayerId.slice(-4)), role:'human', card: BingoEngine.generateCard(), marked: Array(5).fill(null).map(()=>Array(5).fill(false)), score: 0, isWinner: false };
+            const human = { 
+                id: currentPlayerId, 
+                name: playerName || ('Player-'+currentPlayerId.slice(-4)), 
+                role:'human', 
+                card: BingoEngine.generateCard(), 
+                marked: Array(5).fill(null).map(()=>Array(5).fill(false)), 
+                score: 0, 
+                isWinner: false 
+            };
             room.players[botIndex] = human;
-            room.ownerId = room.ownerId || currentPlayerId;
-            room.ownerName = room.ownerName || human.name;
+            if (!room.ownerId) {
+                room.ownerId = currentPlayerId;
+                room.ownerName = human.name;
+            }
             saveRooms();
             enterRoom(roomId);
             return true;
@@ -174,7 +205,6 @@
         }
 
         function leaveRoom() {
-            // if human was in room, replace with bot
             if (currentPlayerId && currentRoomId) {
                 const room = findRoom(currentRoomId);
                 if (room) {
@@ -182,47 +212,100 @@
                     if (idx!==-1) room.players[idx] = createBot(idx);
                 }
             }
-            currentPlayerId = null; currentRoomId = null;
+            currentPlayerId = null; 
+            currentRoomId = null;
+            if (timerInterval) clearInterval(timerInterval);
             document.getElementById('lobby').classList.remove('hidden');
             document.getElementById('gameScreen').classList.add('hidden');
-            saveRooms(); renderRoomsList();
+            saveRooms(); 
+            renderRoomsList();
         }
 
         function startRoom(roomId, starterId) {
-            const room = findRoom(roomId); if(!room) return;
-            // fill any empty slots with bots (they're already bots by default), mark status
+            const room = findRoom(roomId); 
+            if(!room) return;
             room.status = 'in-progress';
+            room.startedAt = Date.now();
             room.calledNumbers = [];
             room.currentNumber = null;
             room.winner = null;
             saveRooms();
-            if (currentRoomId === roomId) renderRoom();
+            if (currentRoomId === roomId) {
+                renderRoom();
+                startRoomTimer();
+            }
         }
 
-        // UI: rooms list
+        function startRoomTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const room = findRoom(currentRoomId);
+                if (!room) return;
+                
+                const elapsed = Date.now() - room.startedAt;
+                const remaining = ROOM_EXPIRY_TIME - elapsed;
+                
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    // Remove the room
+                    rooms = rooms.filter(r => r.id !== currentRoomId);
+                    saveRooms();
+                    leaveRoom();
+                    alert('Game ended! Room has been closed.');
+                } else {
+                    const minutes = Math.floor(remaining / 60000);
+                    const seconds = Math.floor((remaining % 60000) / 1000);
+                    document.getElementById('timerDisplay').textContent = `Room closes in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
         function renderRoomsList(){
-            const container = document.getElementById('roomsList'); container.innerHTML='';
-            if (rooms.length===0){ container.innerHTML = '<div>No rooms yet. Create one!</div>'; return; }
+            const container = document.getElementById('roomsList'); 
+            container.innerHTML='';
+            
+            // Clean up expired rooms
+            rooms = rooms.filter(r => {
+                if (r.status === 'in-progress' && r.startedAt) {
+                    const elapsed = Date.now() - r.startedAt;
+                    return elapsed < ROOM_EXPIRY_TIME;
+                }
+                return true;
+            });
+            saveRooms();
+            
+            if (rooms.length===0){ 
+                container.innerHTML = '<div>No rooms yet. Create one!</div>'; 
+                return; 
+            }
             rooms.forEach(room=>{
-                const el = document.createElement('div'); el.className='room-card';
+                const el = document.createElement('div'); 
+                el.className='room-card';
+                const humanCount = room.players.filter(p=>p.role==='human').length;
                 el.innerHTML = `<div><strong>${escapeHtml(room.name)}</strong></div>
                                 <div>Owner: ${escapeHtml(room.ownerName||'—')}</div>
-                                <div>Players: ${room.players.filter(p=>p.role==='human').length}/${room.maxPlayers}</div>
+                                <div>Players: ${humanCount}/${room.maxPlayers}</div>
                                 <div>Status: ${room.status}</div>`;
-                const joinBtn = document.createElement('button'); joinBtn.className='btn'; joinBtn.textContent='Join';
-                joinBtn.onclick = ()=>{ const name = document.getElementById('playerName').value.trim(); if(!name) { if(!confirm('Join as guest (no name)?')) return; } joinRoom(room.id, name || null); };
+                const joinBtn = document.createElement('button'); 
+                joinBtn.className='btn'; 
+                joinBtn.textContent='Join';
+                joinBtn.disabled = room.status !== 'waiting' || humanCount >= room.maxPlayers;
+                joinBtn.onclick = ()=>{ 
+                    const name = document.getElementById('playerName').value.trim(); 
+                    if(!name) { 
+                        if(!confirm('Join as guest (no name)?')) return; 
+                    } 
+                    joinRoom(room.id, name || null); 
+                };
                 el.appendChild(joinBtn);
-                if (room.ownerId === currentPlayerId) {
-                    const startBtn = document.createElement('button'); startBtn.className='btn'; startBtn.style.marginLeft='8px'; startBtn.textContent='Start'; startBtn.onclick = ()=>{ startRoom(room.id, currentPlayerId); renderRoomsList(); };
-                    el.appendChild(startBtn);
-                }
                 container.appendChild(el);
             });
         }
 
-        // Rendering room/game screen
         function renderRoom(){
-            const room = findRoom(currentRoomId); if(!room) return;
+            const room = findRoom(currentRoomId); 
+            if(!room) return;
+            
             const isOwner = room.ownerId === currentPlayerId;
             const isWaiting = room.status === 'waiting';
             
@@ -231,6 +314,9 @@
             document.getElementById('ownerStatus').textContent = isOwner ? '👑 You are the room owner' : '';
             document.getElementById('currentNumber').textContent = room.currentNumber || '-';
             document.getElementById('letterBadge').textContent = room.currentNumber ? BingoEngine.getLetterForNumber(room.currentNumber) : '-';
+            
+            const humanCount = room.players.filter(p=>p.role==='human').length;
+            document.getElementById('playerCount').textContent = humanCount;
             
             // Show start button only if owner AND game waiting
             const startBtn = document.getElementById('startBtn');
@@ -246,39 +332,110 @@
             document.getElementById('calledCount').textContent = room.calledNumbers.length;
             document.getElementById('numbersList').innerHTML = room.calledNumbers.map(n=>`<span class="number-badge">${BingoEngine.getLetterForNumber(n)} ${n}</span>`).join(' ');
 
-            const grid = document.getElementById('playersGrid'); grid.innerHTML='';
+            const grid = document.getElementById('playersGrid'); 
+            grid.innerHTML='';
             room.players.forEach(p=>{
-                const pc = document.createElement('div'); pc.className='player-card'+(p.id===currentPlayerId?' current':'');
+                const pc = document.createElement('div'); 
+                pc.className='player-card'+(p.id===currentPlayerId?' current':'');
                 let html = `<div style="text-align:center; font-weight:bold;">${escapeHtml(p.name)} (${p.score}pts)</div><div style="margin-top:8px;" class="bingo-grid">`;
                 for (let r=0;r<5;r++){
                     for (let c=0;c<5;c++){
-                        const number = p.card[c][r]; const marked = p.marked[r][c]; const isFree = number===0;
+                        const number = p.card[c][r]; 
+                        const marked = p.marked[r][c]; 
+                        const isFree = number===0;
                         html += `<div class="bingo-cell ${marked? 'marked':''} ${isFree? 'free':''}">${isFree?'FREE':number}</div>`;
                     }
                 }
                 html += '</div>';
                 if (p.isWinner) html += '<div class="winner-badge">🏆 WINNER!</div>';
-                pc.innerHTML = html; grid.appendChild(pc);
+                pc.innerHTML = html; 
+                grid.appendChild(pc);
             });
         }
 
-        // === Audio: Ensure AudioContext and voices, with test and fallback beep ===
         function ensureAudio(){
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (!AudioCtx) return null;
-            if (!window._bingoAudioCtx){ try{ window._bingoAudioCtx = new AudioCtx(); }catch(e){ window._bingoAudioCtx = null; } }
-            if (window._bingoAudioCtx && window._bingoAudioCtx.state === 'suspended') { window._bingoAudioCtx.resume().catch(()=>{}); }
+            if (!window._bingoAudioCtx){ 
+                try{ window._bingoAudioCtx = new AudioCtx(); }
+                catch(e){ window._bingoAudioCtx = null; } 
+            }
+            if (window._bingoAudioCtx && window._bingoAudioCtx.state === 'suspended') { 
+                window._bingoAudioCtx.resume().catch(()=>{}); 
+            }
             return window._bingoAudioCtx;
         }
 
         class Announcer {
-            static getVoices(){ const v = window.speechSynthesis.getVoices(); if (v && v.length) return Promise.resolve(v); return new Promise(res=>{ const h=()=>{ window.speechSynthesis.removeEventListener('voiceschanged', h); res(window.speechSynthesis.getVoices()); }; window.speechSynthesis.addEventListener('voiceschanged', h); }); }
-            static async getPreferredVoice(){ const voices = await Announcer.getVoices(); if(!voices||!voices.length) return null; let v = voices.find(x=> (x.lang||'').toLowerCase().startsWith('en')); return v || voices[0]; }
-            static async speak(text){ if(!soundEnabled) return; try{ window.speechSynthesis.cancel(); const utt = new SpeechSynthesisUtterance(text); const v = await Announcer.getPreferredVoice(); if(v) utt.voice = v; utt.rate = 0.9; utt.pitch = 1; return new Promise(res=>{ utt.onend = ()=>res(); window.speechSynthesis.speak(utt); }); }catch(e){ console.error('Speech error:', e); Announcer.fallbackBeep(); } }
-            static fallbackBeep(){ const ctx = ensureAudio(); if(!ctx) return; const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type='sine'; o.frequency.value=800; const now = ctx.currentTime;
-                g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.4, now+0.02); o.start(now); g.gain.exponentialRampToValueAtTime(0.001, now+0.18); o.stop(now+0.18);
+            static getVoices(){ 
+                const v = window.speechSynthesis.getVoices(); 
+                if (v && v.length) return Promise.resolve(v); 
+                return new Promise(res=>{ 
+                    const h=()=>{ 
+                        window.speechSynthesis.removeEventListener('voiceschanged', h); 
+                        res(window.speechSynthesis.getVoices()); 
+                    }; 
+                    window.speechSynthesis.addEventListener('voiceschanged', h); 
+                }); 
             }
-            static playShake(duration=300){ const ctx = ensureAudio(); if(!ctx) return Promise.resolve(); const sampleRate = ctx.sampleRate; const bufferSize = Math.floor(sampleRate * (duration/1000)); const buffer = ctx.createBuffer(1, bufferSize, sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<bufferSize;i++) data[i] = Math.random()*0.3 - 0.15; const src = ctx.createBufferSource(); src.buffer = buffer; const g = ctx.createGain(); src.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.3, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration/1000); src.start(ctx.currentTime); return new Promise(r=> setTimeout(r, duration)); }
+            static async getPreferredVoice(){ 
+                const voices = await Announcer.getVoices(); 
+                if(!voices||!voices.length) return null; 
+                let v = voices.find(x=> (x.lang||'').toLowerCase().startsWith('en')); 
+                return v || voices[0]; 
+            }
+            static async speak(text){ 
+                if(!soundEnabled) return; 
+                try{ 
+                    window.speechSynthesis.cancel(); 
+                    const utt = new SpeechSynthesisUtterance(text); 
+                    const v = await Announcer.getPreferredVoice(); 
+                    if(v) utt.voice = v; 
+                    utt.rate = 0.9; 
+                    utt.pitch = 1; 
+                    return new Promise(res=>{ 
+                        utt.onend = ()=>res(); 
+                        window.speechSynthesis.speak(utt); 
+                    }); 
+                }catch(e){ 
+                    console.error('Speech error:', e); 
+                    Announcer.fallbackBeep(); 
+                } 
+            }
+            static fallbackBeep(){ 
+                const ctx = ensureAudio(); 
+                if(!ctx) return; 
+                const o = ctx.createOscillator(); 
+                const g = ctx.createGain(); 
+                o.connect(g); 
+                g.connect(ctx.destination); 
+                o.type='sine'; 
+                o.frequency.value=800; 
+                const now = ctx.currentTime;
+                g.gain.setValueAtTime(0.001, now); 
+                g.gain.exponentialRampToValueAtTime(0.4, now+0.02); 
+                o.start(now); 
+                g.gain.exponentialRampToValueAtTime(0.001, now+0.18); 
+                o.stop(now+0.18);
+            }
+            static playShake(duration=300){ 
+                const ctx = ensureAudio(); 
+                if(!ctx) return Promise.resolve(); 
+                const sampleRate = ctx.sampleRate; 
+                const bufferSize = Math.floor(sampleRate * (duration/1000)); 
+                const buffer = ctx.createBuffer(1, bufferSize, sampleRate); 
+                const data = buffer.getChannelData(0); 
+                for(let i=0;i<bufferSize;i++) data[i] = Math.random()*0.3 - 0.15; 
+                const src = ctx.createBufferSource(); 
+                src.buffer = buffer; 
+                const g = ctx.createGain(); 
+                src.connect(g); 
+                g.connect(ctx.destination); 
+                g.gain.setValueAtTime(0.3, ctx.currentTime); 
+                g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration/1000); 
+                src.start(ctx.currentTime); 
+                return new Promise(r=> setTimeout(r, duration)); 
+            }
             static async announceNumber(letter, number){ 
                 try{ await Announcer.playShake(300); }catch(e){} 
                 const text = letter+' '+number; 
@@ -289,7 +446,14 @@
             }
         }
 
-        function testAudio(){ ensureAudio(); Announcer.getVoices().then(v=>{ document.getElementById('audioStatus').textContent = 'Audio: voices loaded ('+ (v.length) +')'; }).catch(()=>{ document.getElementById('audioStatus').textContent = 'Audio: No voices available'; }); }
+        function testAudio(){ 
+            ensureAudio(); 
+            Announcer.getVoices().then(v=>{ 
+                document.getElementById('audioStatus').textContent = 'Audio: voices loaded ('+ (v.length) +')'; 
+            }).catch(()=>{ 
+                document.getElementById('audioStatus').textContent = 'Audio: No voices available'; 
+            }); 
+        }
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
@@ -298,12 +462,21 @@
         }
 
         // Buttons wiring
-        document.getElementById('enableAudioBtn').addEventListener('click', ()=>{ ensureAudio(); testAudio(); });
-        document.getElementById('createRoomBtn').addEventListener('click', ()=>{ const name = document.getElementById('newRoomName').value.trim(); const max = parseInt(document.getElementById('newRoomMax').value) || DEFAULT_MAX; const room = createRoom(name || null, max); const ownerId = 'player-' + Math.random().toString(36).substring(7); const ownerName = document.getElementById('playerName').value.trim() || 'Owner'; room.ownerId = ownerId; room.ownerName = ownerName; currentPlayerId = ownerId; 
-            if(ownerId){ joinRoom(room.id, ownerName); }
+        document.getElementById('enableAudioBtn').addEventListener('click', ()=>{ 
+            ensureAudio(); 
+            testAudio(); 
+        });
+        document.getElementById('createRoomBtn').addEventListener('click', ()=>{ 
+            const name = document.getElementById('newRoomName').value.trim(); 
+            const ownerId = 'player-' + Math.random().toString(36).substring(7); 
+            const ownerName = document.getElementById('playerName').value.trim() || 'Owner'; 
+            const room = createRoom(name || null, ownerId, ownerName); 
+            currentPlayerId = ownerId;
+            if(ownerId){ 
+                joinRoom(room.id, ownerName); 
+            }
         });
 
-        // Called number functions (operate on currentRoom)
         function callNextNumber(){ 
             const room = findRoom(currentRoomId); 
             if(!room || room.status!=='in-progress') return; 
@@ -316,37 +489,92 @@
             renderRoom(); 
         }
 
-        function markNumberOnAll(room, calledNum){ room.players.forEach(p=>{ const positions = BingoEngine.findNumberPositions(p.card, calledNum); positions.forEach(pos=>{ const [r,c]=pos; p.marked[r][c]=true; }); }); }
+        function markNumberOnAll(room, calledNum){ 
+            room.players.forEach(p=>{ 
+                const positions = BingoEngine.findNumberPositions(p.card, calledNum); 
+                positions.forEach(pos=>{ 
+                    const [r,c]=pos; 
+                    p.marked[r][c]=true; 
+                }); 
+            }); 
+        }
 
-        function startSelectedRoom(){ if(!currentRoomId) return; startRoom(currentRoomId, currentPlayerId); renderRoom(); }
+        function startSelectedRoom(){ 
+            if(!currentRoomId) return; 
+            startRoom(currentRoomId, currentPlayerId); 
+            renderRoom(); 
+        }
 
-        // helper
-        function escapeHtml(s){ if(!s) return ''; return (''+s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function escapeHtml(s){ 
+            if(!s) return ''; 
+            return (''+s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); 
+        }
 
-        // === Bingo Engine (same as before) ===
         class BingoEngine{ 
             static generateCard(){ 
-                const card=[]; const used=new Set(); 
+                const card=[]; 
+                const used=new Set(); 
                 for(let col=0;col<5;col++){ 
-                    const column=[]; const min=1+col*15; const max=min+14; 
+                    const column=[]; 
+                    const min=1+col*15; 
+                    const max=min+14; 
                     while(column.length<5){ 
                         const num = Math.floor(Math.random()*(max-min+1))+min; 
-                        if(!used.has(num)) { column.push(num); used.add(num); } 
+                        if(!used.has(num)) { 
+                            column.push(num); 
+                            used.add(num); 
+                        } 
                     } 
                     card.push(column); 
                 } 
                 card[2][2] = 0;
                 return card;
             }
-            static checkWin(marked){ const size=marked.length; for(let i=0;i<size;i++){ if(marked[i].every(cell=>cell)) return true; } for(let j=0;j<size;j++){ if(marked.every(row=>row[j])) return true; } for(let i=0;i<size;i++){ if(marked[i][i]) {} else return false; } return true; }
-            static getNextNumber(called){ let num; do{ num = Math.floor(Math.random()*75)+1; } while(called.includes(num)); return num; }
-            static findNumberPositions(card, number){ const positions=[]; for(let col=0;col<card.length;col++){ const column = card[col]; for(let row=0;row<column.length;row++){ if(column[row]===number) positions.push([row,col]); } } return positions; }
-            static getLetterForNumber(number){ const letters=['B','I','N','G','O']; if(number>=1&&number<=15) return letters[0]; if(number>=16&&number<=30) return letters[1]; if(number>=31&&number<=45) return letters[2]; if(number>=46&&number<=60) return letters[3]; if(number>=61&&number<=75) return letters[4]; return '?'; }
+            static checkWin(marked){ 
+                const size=marked.length; 
+                for(let i=0;i<size;i++){ 
+                    if(marked[i].every(cell=>cell)) return true; 
+                } 
+                for(let j=0;j<size;j++){ 
+                    if(marked.every(row=>row[j])) return true; 
+                } 
+                for(let i=0;i<size;i++){ 
+                    if(marked[i][i]) {} else return false; 
+                } 
+                return true; 
+            }
+            static getNextNumber(called){ 
+                let num; 
+                do{ 
+                    num = Math.floor(Math.random()*75)+1; 
+                } while(called.includes(num)); 
+                return num; 
+            }
+            static findNumberPositions(card, number){ 
+                const positions=[]; 
+                for(let col=0;col<card.length;col++){ 
+                    const column = card[col]; 
+                    for(let row=0;row<column.length;row++){ 
+                        if(column[row]===number) positions.push([row,col]); 
+                    } 
+                } 
+                return positions; 
+            }
+            static getLetterForNumber(number){ 
+                const letters=['B','I','N','G','O']; 
+                if(number>=1&&number<=15) return letters[0]; 
+                if(number>=16&&number<=30) return letters[1]; 
+                if(number>=31&&number<=45) return letters[2]; 
+                if(number>=46&&number<=60) return letters[3]; 
+                if(number>=61&&number<=75) return letters[4]; 
+                return '?'; 
+            }
         }
 
         // Init
-        (function init(){ loadRooms(); renderRoomsList(); // auto-create a default room if none
-            if(rooms.length===0){ createRoom('Main Room', DEFAULT_MAX, null, null); }
+        (function init(){ 
+            loadRooms(); 
+            renderRoomsList();
         })();
 
     </script>
