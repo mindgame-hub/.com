@@ -91,9 +91,9 @@
                             <div style="font-size:28px; font-weight:bold;"> <span id="currentNumber">-</span></div>
                         </div>
                         <div class="controls">
+                            <button id="startBtn" class="btn" onclick="startSelectedRoom()" style="background: #4CAF50;">▶️ START GAME</button>
                             <button id="callBtn" class="btn" onclick="callNextNumber()">📢 Call Next</button>
                             <button id="soundToggle" class="btn" onclick="toggleSound()">🔊 Sound ON</button>
-                            <button id="startBtn" class="btn" onclick="startSelectedRoom()">▶️ Start Game</button>
                         </div>
                         <div class="status">
                             <span id="roomStatus">Status: -</span><br>
@@ -318,13 +318,13 @@
             const humanCount = room.players.filter(p=>p.role==='human').length;
             document.getElementById('playerCount').textContent = humanCount;
             
-            // Show start button only if owner AND game waiting
+            // Show start button - ALWAYS visible for owner when waiting, HIDDEN when playing
             const startBtn = document.getElementById('startBtn');
             if (isOwner && isWaiting) {
-                startBtn.classList.remove('hidden');
+                startBtn.style.display = 'block';
                 startBtn.disabled = false;
             } else {
-                startBtn.classList.add('hidden');
+                startBtn.style.display = 'none';
                 startBtn.disabled = true;
             }
             
@@ -501,8 +501,8 @@
 
         function startSelectedRoom(){ 
             if(!currentRoomId) return; 
+            console.log('Starting room:', currentRoomId);
             startRoom(currentRoomId, currentPlayerId); 
-            renderRoom(); 
         }
 
         function escapeHtml(s){ 
