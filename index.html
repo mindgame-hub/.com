@@ -36,13 +36,15 @@
         .winner-badge { background: gold; color: red; padding: 8px; border-radius: 4px; margin-top: 8px; font-weight: bold; text-align: center; }
         .info-text { background: #fffacd; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 12px; }
         .timer { font-weight: bold; color: #d9534f; }
+        .human-badge { background: #2196f3; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+        .bot-badge { background: #999; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="lobby" class="lobby">
             <h1>🎮 Bingo Battle Royale — Lobby</h1>
-            <p style="color:#666;">Create or join rooms. Max 15 players per room. Rooms auto-fill with bots. Rooms close 15 min after game starts.</p>
+            <p style="color:#666;">Create or join rooms. Max 15 players per room. Bots fill empty slots when game starts.</p>
 
             <div style="display:flex; gap:12px; align-items:center; margin-top:12px;">
                 <div class="form-group">
@@ -68,8 +70,8 @@
                 <strong>Notes:</strong>
                 <ul>
                     <li>• Rooms persist locally (localStorage). Clearing browser storage removes them.</li>
-                    <li>• Max 15 players per room. Empty slots auto-fill with Bisaya bots.</li>
-                    <li>• Owner can start anytime (full or not). Bots join to fill empty slots.</li>
+                    <li>• Max 15 players per room. Empty slots auto-fill with Bisaya bots when game starts.</li>
+                    <li>• Owner can start anytime (full or not). Game will have 15 total players.</li>
                     <li>• Rooms auto-close and remove 15 minutes after game starts.</li>
                 </ul>
             </div>
@@ -109,7 +111,7 @@
                 </div>
 
                 <div style="width:420px;">
-                    <h4>Players (<span id="playerCount">0</span>/15)</h4>
+                    <h4>Players Joined (<span id="playerCount">0</span>/15) <span style="font-size: 12px; color: #666;">- Bots fill rest on start</span></h4>
                     <div id="playersGrid" class="players-grid"></div>
                 </div>
             </div>
@@ -140,8 +142,8 @@
                 id: 'bot-' + Math.random().toString(36).substring(7),
                 name: bisayaBotNames[index % bisayaBotNames.length],
                 role: 'bot',
-                card: BingoEngine.generateCard(),
-                marked: Array(5).fill(null).map(()=>Array(5).fill(false)),
+                card: null,
+                marked: null,
                 score: 0,
                 isWinner: false
             };
@@ -149,8 +151,7 @@
 
         function createRoom(name, ownerId, ownerName) {
             const id = generateId('room');
-            const players = [];
-            for (let i=0; i<MAX_PLAYERS; i++) players.push(createBot(i));
+            const players = []; // Start with EMPTY - will add owner
             const room = { 
                 id, 
                 name: name || 'Room '+id.slice(-4), 
@@ -175,8 +176,8 @@
         function joinRoom(roomId, playerName) {
             const room = findRoom(roomId); 
             if(!room) return false;
-            const botIndex = room.players.findIndex(p=>p.role==='bot');
-            if (botIndex === -1) return false;
+            if (room.players.length >= MAX_PLAYERS) return false;
+            
             currentPlayerId = 'player-' + Math.random().toString(36).substring(7);
             const human = { 
                 id: currentPlayerId, 
@@ -187,7 +188,7 @@
                 score: 0, 
                 isWinner: false 
             };
-            room.players[botIndex] = human;
+            room.players.push(human);
             if (!room.ownerId) {
                 room.ownerId = currentPlayerId;
                 room.ownerName = human.name;
@@ -209,7 +210,9 @@
                 const room = findRoom(currentRoomId);
                 if (room) {
                     const idx = room.players.findIndex(p=>p.id===currentPlayerId);
-                    if (idx!==-1) room.players[idx] = createBot(idx);
+                    if (idx!==-1) {
+                        room.players.splice(idx, 1); // Remove player from room
+                    }
                 }
             }
             currentPlayerId = null; 
@@ -221,9 +224,24 @@
             renderRoomsList();
         }
 
+        function fillBotsToMax(room) {
+            // Fill remaining slots with bots
+            while (room.players.length < MAX_PLAYERS) {
+                const botIndex = room.players.length;
+                const bot = createBot(botIndex);
+                bot.card = BingoEngine.generateCard();
+                bot.marked = Array(5).fill(null).map(()=>Array(5).fill(false));
+                room.players.push(bot);
+            }
+        }
+
         function startRoom(roomId, starterId) {
             const room = findRoom(roomId); 
             if(!room) return;
+            
+            // Fill remaining slots with bots
+            fillBotsToMax(room);
+            
             room.status = 'in-progress';
             room.startedAt = Date.now();
             room.calledNumbers = [];
@@ -284,7 +302,7 @@
                 const humanCount = room.players.filter(p=>p.role==='human').length;
                 el.innerHTML = `<div><strong>${escapeHtml(room.name)}</strong></div>
                                 <div>Owner: ${escapeHtml(room.ownerName||'—')}</div>
-                                <div>Players: ${humanCount}/${room.maxPlayers}</div>
+                                <div>Joined: ${humanCount}/${room.maxPlayers}</div>
                                 <div>Status: ${room.status}</div>`;
                 const joinBtn = document.createElement('button'); 
                 joinBtn.className='btn'; 
@@ -334,17 +352,21 @@
 
             const grid = document.getElementById('playersGrid'); 
             grid.innerHTML='';
-            room.players.forEach(p=>{
+            room.players.forEach((p, idx)=>{
                 const pc = document.createElement('div'); 
                 pc.className='player-card'+(p.id===currentPlayerId?' current':'');
-                let html = `<div style="text-align:center; font-weight:bold;">${escapeHtml(p.name)} (${p.score}pts)</div><div style="margin-top:8px;" class="bingo-grid">`;
-                for (let r=0;r<5;r++){
-                    for (let c=0;c<5;c++){
-                        const number = p.card[c][r]; 
-                        const marked = p.marked[r][c]; 
-                        const isFree = number===0;
-                        html += `<div class="bingo-cell ${marked? 'marked':''} ${isFree? 'free':''}">${isFree?'FREE':number}</div>`;
+                let html = `<div style="text-align:center; font-weight:bold;">${escapeHtml(p.name)} ${p.role==='human' ? '<span class="human-badge">YOU</span>' : '<span class="bot-badge">BOT</span>'}</div><div style="margin-top:8px;" class="bingo-grid">`;
+                if (p.card) {
+                    for (let r=0;r<5;r++){
+                        for (let c=0;c<5;c++){
+                            const number = p.card[c][r]; 
+                            const marked = p.marked[r][c]; 
+                            const isFree = number===0;
+                            html += `<div class="bingo-cell ${marked? 'marked':''} ${isFree? 'free':''}">${isFree?'FREE':number}</div>`;
+                        }
                     }
+                } else {
+                    html += '<div style="padding: 20px; text-align: center; color: #999;">Waiting to start...</div>';
                 }
                 html += '</div>';
                 if (p.isWinner) html += '<div class="winner-badge">🏆 WINNER!</div>';
@@ -501,7 +523,6 @@
 
         function startSelectedRoom(){ 
             if(!currentRoomId) return; 
-            console.log('Starting room:', currentRoomId);
             startRoom(currentRoomId, currentPlayerId); 
         }
 
