@@ -26,6 +26,11 @@
         .status { margin-top:8px; font-size:13px; color:#333; }
         .audio-status { margin-left:10px; font-weight:bold; }
         .hidden{ display:none; }
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+        .bingo-cell { background: #f0f0f0; border: 1px solid #ccc; }
+        .bingo-cell.marked { background: #4CAF50; color: white; font-weight: bold; }
+        .bingo-cell.free { background: #FFD700; font-weight: bold; }
+        .winner-badge { background: gold; color: red; padding: 8px; border-radius: 4px; margin-top: 8px; font-weight: bold; text-align: center; }
     </style>
 </head>
 <body>
@@ -77,7 +82,7 @@
                 <div style="flex:1;">
                     <div class="current-number">
                         <div style="display:flex; gap:12px; align-items:center;">
-                            <div style="background:white; color:#667eea; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:26px;"> <span id="letterBadge">-</span></div>
+                            <div style="background:white; color:#667eea; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:28px;" id="letterBadge">-</div>
                             <div style="font-size:28px; font-weight:bold;"> <span id="currentNumber">-</span></div>
                         </div>
                         <div class="controls">
@@ -150,7 +155,7 @@
             const botIndex = room.players.findIndex(p=>p.role==='bot');
             if (botIndex === -1) return false;
             currentPlayerId = 'player-' + Math.random().toString(36).substring(7);
-            const human = { id: currentPlayerId, name: playerName || ('Player-'+currentPlayerId.slice(-4)), role:'human', card: BingoEngine.generateCard(), marked: Array(5).fill(null).map(()=>Array(5).fill(false)), score:0, isWinner:false };
+            const human = { id: currentPlayerId, name: playerName || ('Player-'+currentPlayerId.slice(-4)), role:'human', card: BingoEngine.generateCard(), marked: Array(5).fill(null).map(()=>Array(5).fill(false)), score: 0, isWinner: false };
             room.players[botIndex] = human;
             room.ownerId = room.ownerId || currentPlayerId;
             room.ownerName = room.ownerName || human.name;
@@ -250,31 +255,51 @@
         }
 
         class Announcer {
-            static getVoices(){ const v = window.speechSynthesis.getVoices(); if (v && v.length) return Promise.resolve(v); return new Promise(res=>{ const h=()=>{ window.speechSynthesis.removeEventListener('voiceschanged',h); res(window.speechSynthesis.getVoices()); }; window.speechSynthesis.addEventListener('voiceschanged',h); setTimeout(()=>res(window.speechSynthesis.getVoices()),1000); }); }
-            static async getPreferredVoice(){ const voices = await Announcer.getVoices(); if(!voices||!voices.length) return null; let v = voices.find(x=> (x.lang||'').toLowerCase().startsWith('en') ); return v || voices[0]; }
-            static async speak(text){ if(!soundEnabled) return; try{ window.speechSynthesis.cancel(); const utt = new SpeechSynthesisUtterance(text); const v = await Announcer.getPreferredVoice(); if(v){ utt.voice = v; utt.lang = v.lang||'en-US'; } else utt.lang='en-US'; window.speechSynthesis.speak(utt); }catch(e){ /* fallback: beep */ Announcer.fallbackBeep(); } }
-            static fallbackBeep(){ const ctx = ensureAudio(); if(!ctx) return; const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type='sine'; o.frequency.value=800; g.gain.value=0.001; const now = ctx.currentTime; // quick chirp
+            static getVoices(){ const v = window.speechSynthesis.getVoices(); if (v && v.length) return Promise.resolve(v); return new Promise(res=>{ const h=()=>{ window.speechSynthesis.removeEventListener('voiceschanged', h); res(window.speechSynthesis.getVoices()); }; window.speechSynthesis.addEventListener('voiceschanged', h); }); }
+            static async getPreferredVoice(){ const voices = await Announcer.getVoices(); if(!voices||!voices.length) return null; let v = voices.find(x=> (x.lang||'').toLowerCase().startsWith('en')); return v || voices[0]; }
+            static async speak(text){ if(!soundEnabled) return; try{ window.speechSynthesis.cancel(); const utt = new SpeechSynthesisUtterance(text); const v = await Announcer.getPreferredVoice(); if(v) utt.voice = v; utt.rate = 0.9; utt.pitch = 1; return new Promise(res=>{ utt.onend = ()=>res(); window.speechSynthesis.speak(utt); }); }catch(e){ console.error('Speech error:', e); Announcer.fallbackBeep(); } }
+            static fallbackBeep(){ const ctx = ensureAudio(); if(!ctx) return; const o = ctx.createOscillator(); const g = ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type='sine'; o.frequency.value=800; const now = ctx.currentTime;
                 g.gain.setValueAtTime(0.001, now); g.gain.exponentialRampToValueAtTime(0.4, now+0.02); o.start(now); g.gain.exponentialRampToValueAtTime(0.001, now+0.18); o.stop(now+0.18);
             }
-            static playShake(duration=300){ const ctx = ensureAudio(); if(!ctx) return Promise.resolve(); const sampleRate = ctx.sampleRate; const bufferSize = Math.floor(sampleRate * (duration/1000)); const buf = ctx.createBuffer(1, bufferSize, sampleRate); const data = buf.getChannelData(0); for(let i=0;i<bufferSize;i++){ const decay = Math.exp(-4*i/bufferSize); data[i] = (Math.random()*2-1)*decay*0.7; } const src = ctx.createBufferSource(); src.buffer = buf; const band = ctx.createBiquadFilter(); band.type='bandpass'; band.frequency.value=180; band.Q.value=0.8; const gain = ctx.createGain(); gain.gain.value=0.9; src.connect(band); band.connect(gain); gain.connect(ctx.destination); src.start(0); return new Promise(res=>{ src.onended = ()=>res(); }); }
-            static async announceNumber(letter, number){ try{ await Announcer.playShake(300); }catch(e){} const text = letter+' '+number; document.getElementById('numbersList'); Announcer.speak(text); }
-            static announceBingo(name){ Announcer.speak('Bingo! The winner is '+name+'. Thanks for playing!'); }
+            static playShake(duration=300){ const ctx = ensureAudio(); if(!ctx) return Promise.resolve(); const sampleRate = ctx.sampleRate; const bufferSize = Math.floor(sampleRate * (duration/1000)); const buffer = ctx.createBuffer(1, bufferSize, sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<bufferSize;i++) data[i] = Math.random()*0.3 - 0.15; const src = ctx.createBufferSource(); src.buffer = buffer; const g = ctx.createGain(); src.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.3, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration/1000); src.start(ctx.currentTime); return new Promise(r=> setTimeout(r, duration)); }
+            static async announceNumber(letter, number){ 
+                try{ await Announcer.playShake(300); }catch(e){} 
+                const text = letter+' '+number; 
+                await Announcer.speak(text); 
+            }
+            static async announceBingo(name){ 
+                await Announcer.speak('Bingo! The winner is '+name+'. Thanks for playing!'); 
+            }
         }
 
-        function testAudio(){ ensureAudio(); Announcer.getVoices().then(v=>{ document.getElementById('audioStatus').textContent = 'Audio: voices loaded ('+ (v.length) +')'; }).catch(()=>{ document.getElementById('audioStatus').textContent = 'Audio: voices unavailable'; }); Announcer.playShake(200).then(()=>Announcer.speak('Audio test')).catch(()=>{ Announcer.fallbackBeep(); }); }
+        function testAudio(){ ensureAudio(); Announcer.getVoices().then(v=>{ document.getElementById('audioStatus').textContent = 'Audio: voices loaded ('+ (v.length) +')'; }).catch(()=>{ document.getElementById('audioStatus').textContent = 'Audio: No voices available'; }); }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundToggle');
+            btn.textContent = soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF';
+        }
 
         // Buttons wiring
         document.getElementById('enableAudioBtn').addEventListener('click', ()=>{ ensureAudio(); testAudio(); });
-        document.getElementById('createRoomBtn').addEventListener('click', ()=>{ const name = document.getElementById('newRoomName').value.trim(); const max = parseInt(document.getElementById('newRoomMax').value)||DEFAULT_MAX; const playerName = document.getElementById('playerName').value.trim(); const ownerId = playerName? 'player-'+Math.random().toString(36).slice(2,9): null; const ownerName = playerName || null; const room = createRoom(name, Math.max(2, Math.min(50, max)), ownerId, ownerName); // if owner created with a name, join them
+        document.getElementById('createRoomBtn').addEventListener('click', ()=>{ const name = document.getElementById('newRoomName').value.trim(); const max = parseInt(document.getElementById('newRoomMax').value) || DEFAULT_MAX; const room = createRoom(name || null, max); const ownerId = 'player-' + Math.random().toString(36).substring(7); const ownerName = document.getElementById('playerName').value.trim() || 'Owner'; room.ownerId = ownerId; room.ownerName = ownerName; currentPlayerId = ownerId; 
             if(ownerId){ joinRoom(room.id, ownerName); }
         });
 
         // Called number functions (operate on currentRoom)
-        function callNextNumber(){ const room = findRoom(currentRoomId); if(!room || room.status!=='in-progress') return; const next = BingoEngine.getNextNumber(room.calledNumbers); room.calledNumbers.push(next); room.currentNumber = next; // announce
-            Announcer.announceNumber(BingoEngine.getLetterForNumber(next), next); // auto-mark
-            markNumberOnAll(room, next); saveRooms(); renderRoom(); }
+        function callNextNumber(){ 
+            const room = findRoom(currentRoomId); 
+            if(!room || room.status!=='in-progress') return; 
+            const next = BingoEngine.getNextNumber(room.calledNumbers); 
+            room.calledNumbers.push(next); 
+            room.currentNumber = next;
+            markNumberOnAll(room, next); 
+            Announcer.announceNumber(BingoEngine.getLetterForNumber(next), next);
+            saveRooms(); 
+            renderRoom(); 
+        }
 
-        function markNumberOnAll(room, calledNum){ room.players.forEach(p=>{ const positions = BingoEngine.findNumberPositions(p.card, calledNum); positions.forEach(pos=>{ const [r,c]=pos; p.marked[r][c]=true; }); if(BingoEngine.checkWin(p.marked)){ if(room.status==='in-progress'){ p.isWinner=true; p.score += 10; room.status='completed'; room.winner=p; Announcer.announceBingo(p.name); } } }); }
+        function markNumberOnAll(room, calledNum){ room.players.forEach(p=>{ const positions = BingoEngine.findNumberPositions(p.card, calledNum); positions.forEach(pos=>{ const [r,c]=pos; p.marked[r][c]=true; }); }); }
 
         function startSelectedRoom(){ if(!currentRoomId) return; startRoom(currentRoomId, currentPlayerId); renderRoom(); }
 
@@ -282,11 +307,24 @@
         function escapeHtml(s){ if(!s) return ''; return (''+s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
         // === Bingo Engine (same as before) ===
-        class BingoEngine{ static generateCard(){ const card=[]; const used=new Set(); for(let col=0;col<5;col++){ const column=[]; const min=1+col*15; const max=min+14; while(column.length<5){ const num=Math.floor(Math.random()*(max-min+1))+min; if(!used.has(num)){ column.push(num); used.add(num); } } card.push(column); } card[2][2]=0; return card; }
-            static checkWin(marked){ const size=marked.length; for(let i=0;i<size;i++){ if(marked[i].every(cell=>cell)) return true; } for(let j=0;j<size;j++){ if(marked.every(row=>row[j])) return true; } if(marked.every((row,i)=>row[i])) return true; if(marked.every((row,i)=>row[size-1-i])) return true; return false; }
+        class BingoEngine{ 
+            static generateCard(){ 
+                const card=[]; const used=new Set(); 
+                for(let col=0;col<5;col++){ 
+                    const column=[]; const min=1+col*15; const max=min+14; 
+                    while(column.length<5){ 
+                        const num = Math.floor(Math.random()*(max-min+1))+min; 
+                        if(!used.has(num)) { column.push(num); used.add(num); } 
+                    } 
+                    card.push(column); 
+                } 
+                card[2][2] = 0;
+                return card;
+            }
+            static checkWin(marked){ const size=marked.length; for(let i=0;i<size;i++){ if(marked[i].every(cell=>cell)) return true; } for(let j=0;j<size;j++){ if(marked.every(row=>row[j])) return true; } for(let i=0;i<size;i++){ if(marked[i][i]) {} else return false; } return true; }
             static getNextNumber(called){ let num; do{ num = Math.floor(Math.random()*75)+1; } while(called.includes(num)); return num; }
             static findNumberPositions(card, number){ const positions=[]; for(let col=0;col<card.length;col++){ const column = card[col]; for(let row=0;row<column.length;row++){ if(column[row]===number) positions.push([row,col]); } } return positions; }
-            static getLetterForNumber(number){ const letters=['B','I','N','G','O']; if(number>=1&&number<=15) return letters[0]; if(number>=16&&number<=30) return letters[1]; if(number>=31&&number<=45) return letters[2]; if(number>=46&&number<=60) return letters[3]; if(number>=61&&number<=75) return letters[4]; return '-'; }
+            static getLetterForNumber(number){ const letters=['B','I','N','G','O']; if(number>=1&&number<=15) return letters[0]; if(number>=16&&number<=30) return letters[1]; if(number>=31&&number<=45) return letters[2]; if(number>=46&&number<=60) return letters[3]; if(number>=61&&number<=75) return letters[4]; return '?'; }
         }
 
         // Init
