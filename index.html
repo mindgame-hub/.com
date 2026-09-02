@@ -587,15 +587,20 @@
                 return num;
             }
 
-            static findNumberPosition(card, number) {
-                for (let i = 0; i < card.length; i++) {
-                    for (let j = 0; j < card[i].length; j++) {
-                        if (card[i][j] === number) {
-                            return [i, j];
+            static findNumberPositions(card, number) {
+                const positions = [];
+                // Search through each column (represented as an array)
+                for (let col = 0; col < card.length; col++) {
+                    const column = card[col];
+                    // Search within each position in the column
+                    for (let row = 0; row < column.length; row++) {
+                        // Use strict equality (===) to ensure exact match
+                        if (column[row] === number) {
+                            positions.push([row, col]);
                         }
                     }
                 }
-                return null;
+                return positions;
             }
 
             // Get the bingo letter for a number
@@ -614,23 +619,12 @@
         class BotPlayer {
             constructor() {
                 this.name = this.generateName();
-                this.reactionTime = 200 + Math.random() * 400;
             }
 
             generateName() {
                 const firstNames = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Taylor', 'Blake', 'Drew', 'Jamie', 'Chris'];
                 const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
                 return firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)];
-            }
-
-            shouldMarkNumber(card, calledNumber) {
-                const exists = card.some(row => row.includes(calledNumber));
-                if (!exists) return false;
-                return Math.random() < 0.98; // 98% accuracy
-            }
-
-            getReactionDelay() {
-                return this.reactionTime + (Math.random() - 0.5) * 100;
             }
         }
 
@@ -695,7 +689,6 @@
         function callNextNumber() {
             if (gameState.status === 'completed') return;
 
-            const calledSet = new Set(gameState.calledNumbers);
             const nextNumber = BingoEngine.getNextNumber(gameState.calledNumbers);
 
             gameState.calledNumbers.push(nextNumber);
@@ -705,31 +698,32 @@
             const letter = BingoEngine.getLetterForNumber(nextNumber);
             Announcer.announceNumber(letter, nextNumber);
 
-            // Auto-mark the number on all players' cards
+            // Auto-mark the EXACT number on all players' cards
             markNumberOnAllCards(nextNumber);
 
             renderGame();
         }
 
-        // Auto-mark number on all players' cards
+        // Auto-mark EXACT number on all players' cards
         function markNumberOnAllCards(calledNumber) {
             gameState.players.forEach(player => {
-                // Find the position of the called number on this player's card
-                const pos = BingoEngine.findNumberPosition(player.card, calledNumber);
-                if (pos) {
+                // Find ALL positions of the EXACT called number on this player's card
+                const positions = BingoEngine.findNumberPositions(player.card, calledNumber);
+                
+                positions.forEach(pos => {
                     const [row, col] = pos;
                     player.marked[row][col] = true;
+                });
 
-                    // Check if this player won
-                    if (BingoEngine.checkWin(player.marked)) {
-                        if (gameState.status === 'in-progress') {
-                            player.isWinner = true;
-                            player.score += 10;
-                            gameState.status = 'completed';
-                            gameState.winner = player;
-                            // Announce the winner
-                            Announcer.announceBingo(player.name);
-                        }
+                // Check if this player won
+                if (BingoEngine.checkWin(player.marked)) {
+                    if (gameState.status === 'in-progress') {
+                        player.isWinner = true;
+                        player.score += 10;
+                        gameState.status = 'completed';
+                        gameState.winner = player;
+                        // Announce the winner
+                        Announcer.announceBingo(player.name);
                     }
                 }
             });
