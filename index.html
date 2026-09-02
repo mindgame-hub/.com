@@ -23,7 +23,7 @@
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 800px;
         }
 
         .lobby {
@@ -47,33 +47,30 @@
         }
 
         .form-group {
-            margin: 30px 0 20px 0;
+            margin: 20px 0 10px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
         }
 
         .form-group label {
-            display: block;
             font-weight: bold;
-            margin-bottom: 8px;
             color: #333;
+            margin-right: 8px;
         }
 
         .form-group input {
-            width: 100%;
             padding: 12px;
             font-size: 16px;
             border: 2px solid #e0e0e0;
             border-radius: 6px;
             transition: border-color 0.3s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
+            width: 240px;
         }
 
         .btn {
-            width: 100%;
-            padding: 14px;
+            padding: 12px 18px;
             font-size: 16px;
             font-weight: bold;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -82,7 +79,6 @@
             border-radius: 6px;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            margin-top: 10px;
         }
 
         .btn:hover:not(:disabled) {
@@ -90,13 +86,8 @@
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .info-box {
-            margin-top: 30px;
+            margin-top: 20px;
             padding: 15px;
             background: #f5f5f5;
             border-radius: 8px;
@@ -192,14 +183,14 @@
             border-radius: 8px;
             font-size: 32px;
             font-weight: bold;
-            min-width: 80px;
+            min-width: 100px;
             text-align: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             animation: popIn 0.3s ease-out;
         }
 
         .joke-text {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.0);
             color: white;
             padding: 10px 15px;
             border-radius: 6px;
@@ -302,15 +293,17 @@
 
         .players-grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 15px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
             margin: 20px 0;
         }
 
-        @media (min-width: 768px) {
-            .players-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        @media (max-width: 900px) {
+            .players-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .players-grid { grid-template-columns: 1fr; }
         }
 
         .player-card {
@@ -319,6 +312,7 @@
             padding: 10px;
             background: white;
             position: relative;
+            min-height: 120px;
         }
 
         .player-card.current {
@@ -365,89 +359,24 @@
         }
 
         @keyframes markAnimation {
-            0% {
-                transform: scale(0.9);
-            }
-            100% {
-                transform: scale(1);
-            }
+            0% { transform: scale(0.9); }
+            100% { transform: scale(1); }
         }
 
-        .bingo-cell.free {
-            background: #ffc107;
-            font-weight: bold;
-        }
+        .bingo-cell.free { background: #ffc107; font-weight: bold; }
+        .bingo-cell.not-called { cursor: not-allowed; opacity: 0.6; }
+        .bingo-cell.not-called:hover { background: white; }
+        .bingo-cell:hover:not(.not-called):not(.marked) { background: #f0f0f0; }
+        .bingo-cell.marked:hover { background: #4caf50; }
 
-        .bingo-cell.not-called {
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
+        .winner-badge { position: absolute; top: 10px; right: 10px; background: #ffc107; color: #333; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; animation: bounce 0.6s; }
+        @keyframes bounce { 0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);} }
 
-        .bingo-cell.not-called:hover {
-            background: white;
-        }
-
-        .bingo-cell:hover:not(.not-called):not(.marked) {
-            background: #f0f0f0;
-        }
-
-        .bingo-cell.marked:hover {
-            background: #4caf50;
-        }
-
-        .winner-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #ffc107;
-            color: #333;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 12px;
-            animation: bounce 0.6s;
-        }
-
-        @keyframes bounce {
-            0%, 100% {
-                transform: translateY(0);
-            }
-            50% {
-                transform: translateY(-10px);
-            }
-        }
-
-        .called-numbers {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 8px;
-        }
-
-        .called-numbers h3 {
-            margin-bottom: 10px;
-            color: #333;
-            font-size: 16px;
-        }
-
-        .numbers-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .number-badge {
-            background: #2196f3;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        .hidden {
-            display: none;
-        }
+        .called-numbers { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px; }
+        .called-numbers h3 { margin-bottom: 10px; color: #333; font-size: 16px; }
+        .numbers-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .number-badge { background: #2196f3; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -456,23 +385,21 @@
         <div id="lobbyScreen" class="lobby">
             <h1>🎮 Bingo Battle Royale</h1>
             <p>Play bingo against real opponents and climb the leaderboard!</p>
-            <p style="color: #999; font-size: 12px;">Compete, win points, and prove your bingo skills!</p>
+            <p style="color: #999; font-size: 12px;">Room capacity: up to 15 players. Empty rooms auto-fill with bots.</p>
 
             <div class="form-group">
                 <label for="playerName">Enter Your Name:</label>
-                <input type="text" id="playerName" placeholder="Unsa ang imong ngalan?" maxlength="30">
+                <input type="text" id="playerName" placeholder="(optional) Enter name to join" maxlength="30">
+                <button class="btn" onclick="startGame()">🚀 Join & Start</button>
             </div>
 
-            <button class="btn" onclick="startGame()">🚀 Sumali sa Laro</button>
-
             <div class="info-box">
-                <h3>Paano Maglaro</h3>
+                <h3>How it works</h3>
                 <ul>
-                    <li>✓ Makaka-match ka sa ibang players</li>
-                    <li>✓ Mga numero ang itataawag randomly</li>
-                    <li>✓ Automatic na mag-mark ang numbers!</li>
-                    <li>✓ Una na makakuha ng 5 in a row manalo!</li>
-                    <li>✓ Nanalo: 10 points | Runner-up: 5 points</li>
+                    <li>• Single room with up to 15 players.</li>
+                    <li>• If no humans join, the room fills with bots automatically.</li>
+                    <li>• Bot names are local Bisaya names (single-word).</li>
+                    <li>• Clicking Join & Start will replace a bot slot with you (if you provide a name).</li>
                 </ul>
             </div>
         </div>
@@ -480,30 +407,31 @@
         <!-- Game Screen -->
         <div id="gameScreen" class="game-board hidden">
             <div class="game-header">
-                <h2>🎮 Bingo Laro</h2>
+                <h2>🎮 Bingo Room</h2>
                 <div class="current-number">
-                    <h3>📢 Nakatawag na Numero</h3>
+                    <h3>📢 Current Call</h3>
                     <div class="announcer-display">
                         <div class="letter-badge" id="letterBadge">-</div>
                         <div class="number-display" id="currentNumber">-</div>
                     </div>
                     <div class="joke-text" id="jokeText"></div>
                     <div class="controls">
-                        <button onclick="callNextNumber()" id="callBtn">📢 Tawagin ang Susunod</button>
-                        <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊 Tunog ON</button>
+                        <button onclick="callNextNumber()" id="callBtn">📢 Call Next</button>
+                        <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊 Sound ON</button>
+                        <button class="btn" onclick="leaveRoom()">⬅️ Leave Room</button>
                     </div>
                 </div>
             </div>
 
             <div class="game-status">
-                <p>Status: <span id="gameStatus">NAGSISIMULA PA</span></p>
+                <p>Status: <span id="gameStatus">WAITING</span></p>
                 <p id="winnerText" class="winner-text hidden"></p>
             </div>
 
             <div class="players-grid" id="playersGrid"></div>
 
             <div class="called-numbers">
-                <h3>📋 Mga Numero na Nakatawag (<span id="calledCount">0</span>)</h3>
+                <h3>📋 Called Numbers (<span id="calledCount">0</span>)</h3>
                 <div class="numbers-list" id="numbersList"></div>
             </div>
         </div>
@@ -511,13 +439,33 @@
 
     <script>
         // Game State
-        let gameState = null;
-        let currentPlayerId = null;
+        let gameState = null; // single room game state
+        let currentPlayerId = null; // human player id if joined
         let gameId = null;
         let soundEnabled = true;
 
-        // Initialize game with in-memory storage
+        // In-memory storage (keeps multiple rooms in future if needed)
         const gameStorage = {};
+
+        // Configuration
+        const MAX_PLAYERS = 15;
+
+        // Bisaya single-word bot names (no family names)
+        const bisayaBotNames = [
+            'Inday','Dodong','Jun','Nonoy','Boyet','Mayang','Ligaya','Amihan','Datu','Kulas','Oneng','Nene','Toto','Pipoy','Rex'
+        ];
+
+        function createBot(index) {
+            return {
+                id: 'bot-' + Math.random().toString(36).substring(7),
+                name: bisayaBotNames[index % bisayaBotNames.length],
+                role: 'bot',
+                card: BingoEngine.generateCard(),
+                marked: Array(5).fill(null).map(() => Array(5).fill(false)),
+                score: 0,
+                isWinner: false
+            };
+        }
 
         // Keep jokes blank since we will speak in English without jokes
         const bisayaJokes = {};
@@ -546,10 +494,7 @@
                 let voice = voices.find(find);
                 if (voice) return voice;
 
-                // Fallback to any voice with 'ph' or 'fil' hints
-                voice = voices.find(v => (v.lang || '').toLowerCase().includes('ph') || (v.lang || '').toLowerCase().includes('fil') || (v.lang || '').toLowerCase().startsWith('tl'));
-                if (voice) return voice;
-
+                // Fallback to any voice
                 return voices[0] || null;
             }
 
@@ -586,19 +531,19 @@
 
                 // Fill with decaying white noise to simulate a short "shake/rumble"
                 for (let i = 0; i < bufferSize; i++) {
-                    const decay = Math.exp(-3 * i / bufferSize);
-                    data[i] = (Math.random() * 2 - 1) * decay * 0.6;
+                    const decay = Math.exp(-4 * i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1) * decay * 0.7;
                 }
 
                 const source = ctx.createBufferSource();
                 source.buffer = buffer;
                 const bandpass = ctx.createBiquadFilter();
                 bandpass.type = 'bandpass';
-                bandpass.frequency.value = 200; // emphasize low-mid rumble
+                bandpass.frequency.value = 180; // emphasize low-mid rumble
                 bandpass.Q.value = 0.8;
 
                 const gain = ctx.createGain();
-                gain.gain.value = 0.8;
+                gain.gain.value = 0.9;
 
                 source.connect(bandpass);
                 bandpass.connect(gain);
@@ -616,7 +561,7 @@
             static async announceNumber(letter, number) {
                 // Play shake sound, then announce in English without jokes
                 try {
-                    await Announcer.playShakeSound(350);
+                    await Announcer.playShakeSound(300);
                 } catch (e) {
                     // ignore audio errors
                 }
@@ -731,68 +676,71 @@
             }
         }
 
-        // BotPlayer
+        // BotPlayer (not used for last-name generation now)
         class BotPlayer {
-            constructor() {
-                this.name = this.generateName();
-            }
-
-            generateName() {
-                const firstNames = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Taylor', 'Blake', 'Drew', 'Jamie', 'Chris'];
-                const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
-                return firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)];
+            constructor(index) {
+                const b = createBot(index);
+                this.id = b.id;
+                this.name = b.name;
+                this.role = b.role;
+                this.card = b.card;
+                this.marked = b.marked;
+                this.score = b.score;
+                this.isWinner = b.isWinner;
             }
         }
 
-        // Start Game
-        function startGame() {
-            const playerName = document.getElementById('playerName').value.trim();
-            if (!playerName) {
-                alert('Please enter your name!');
-                return;
-            }
-
-            gameId = Math.random().toString(36).substring(7);
+        // Create initial room and fill with bots (will be created when starting the first game)
+        function createInitialRoom() {
             const players = [];
-
-            // Add human player
-            currentPlayerId = 'player-' + Math.random().toString(36).substring(7);
-            players.push({
-                id: currentPlayerId,
-                name: playerName,
-                role: 'human',
-                card: BingoEngine.generateCard(),
-                marked: Array(5).fill(null).map(() => Array(5).fill(false)),
-                score: 0,
-                isWinner: false,
-            });
-
-            // Add bot players
-            const numBots = Math.floor(Math.random() * 3) + 2;
-            for (let i = 0; i < numBots; i++) {
-                const bot = new BotPlayer();
-                players.push({
-                    id: 'bot-' + Math.random().toString(36).substring(7),
-                    name: bot.name,
-                    role: 'bot',
-                    card: BingoEngine.generateCard(),
-                    marked: Array(5).fill(null).map(() => Array(5).fill(false)),
-                    score: 0,
-                    isWinner: false,
-                    bot: bot,
-                });
+            for (let i = 0; i < MAX_PLAYERS; i++) {
+                players.push(createBot(i));
             }
 
-            gameState = {
-                id: gameId,
-                status: 'in-progress',
+            return {
+                id: 'main',
+                status: 'waiting',
                 players,
                 calledNumbers: [],
                 currentNumber: null,
-                winner: null,
+                winner: null
             };
+        }
 
-            gameStorage[gameId] = gameState;
+        // Start Game / Join Room
+        function startGame() {
+            const playerName = document.getElementById('playerName').value.trim();
+
+            if (!gameState) {
+                gameState = createInitialRoom();
+                gameStorage[gameState.id] = gameState;
+            }
+
+            if (playerName) {
+                // Replace first bot slot with the human player
+                const botIndex = gameState.players.findIndex(p => p.role === 'bot');
+                if (botIndex !== -1) {
+                    currentPlayerId = 'player-' + Math.random().toString(36).substring(7);
+                    gameState.players[botIndex] = {
+                        id: currentPlayerId,
+                        name: playerName,
+                        role: 'human',
+                        card: BingoEngine.generateCard(),
+                        marked: Array(5).fill(null).map(() => Array(5).fill(false)),
+                        score: 0,
+                        isWinner: false
+                    };
+                } else {
+                    alert('Room is full (15 players). Cannot join.');
+                    return;
+                }
+            } else {
+                // No name provided: start with bots only (user spectates)
+                currentPlayerId = null;
+            }
+
+            gameId = gameState.id;
+            gameState.status = 'in-progress';
 
             // Show game screen
             document.getElementById('lobbyScreen').classList.add('hidden');
@@ -801,9 +749,27 @@
             renderGame();
         }
 
+        // Leave room (go back to lobby). If human was in room, replace their slot with a new bot.
+        function leaveRoom() {
+            if (currentPlayerId && gameState) {
+                const idx = gameState.players.findIndex(p => p.id === currentPlayerId);
+                if (idx !== -1) {
+                    // replace with a new bot (use next name)
+                    gameState.players[idx] = createBot(idx);
+                }
+            }
+
+            currentPlayerId = null;
+            gameState = null;
+            gameId = null;
+
+            document.getElementById('lobbyScreen').classList.remove('hidden');
+            document.getElementById('gameScreen').classList.add('hidden');
+        }
+
         // Call Next Number
         function callNextNumber() {
-            if (gameState.status === 'completed') return;
+            if (!gameState || gameState.status === 'completed') return;
 
             const nextNumber = BingoEngine.getNextNumber(gameState.calledNumbers);
 
@@ -837,7 +803,7 @@
                 if (BingoEngine.checkWin(player.marked)) {
                     if (gameState.status === 'in-progress') {
                         player.isWinner = true;
-                        player.score += 10;
+                        player.score += 10; // base points (no multiplier)
                         gameState.status = 'completed';
                         gameState.winner = player;
                         // Announce the winner
@@ -849,6 +815,8 @@
 
         // Render Game
         function renderGame() {
+            if (!gameState) return;
+
             // Update current number and letter
             const currentNum = gameState.currentNumber || '-';
             const letter = gameState.currentNumber ? BingoEngine.getLetterForNumber(gameState.currentNumber) : '-';
@@ -858,7 +826,7 @@
             document.getElementById('callBtn').disabled = gameState.status === 'completed';
 
             // Update status
-            const statusText = gameState.status === 'completed' ? 'FINISHED' : 'IN PROGRESS';
+            const statusText = gameState.status === 'completed' ? 'FINISHED' : (gameState.status === 'in-progress' ? 'IN PROGRESS' : 'WAITING');
             document.getElementById('gameStatus').textContent = statusText;
 
             // Update winner
