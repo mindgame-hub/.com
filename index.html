@@ -156,6 +156,7 @@
             align-items: center;
             gap: 15px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
 
         .letter-badge {
@@ -195,6 +196,29 @@
             text-align: center;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             animation: popIn 0.3s ease-out;
+        }
+
+        .joke-text {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-style: italic;
+            max-width: 300px;
+            text-align: center;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .controls {
@@ -436,19 +460,19 @@
 
             <div class="form-group">
                 <label for="playerName">Enter Your Name:</label>
-                <input type="text" id="playerName" placeholder="What should we call you?" maxlength="30">
+                <input type="text" id="playerName" placeholder="Unsa ang imong ngalan?" maxlength="30">
             </div>
 
-            <button class="btn" onclick="startGame()">🚀 Join Game</button>
+            <button class="btn" onclick="startGame()">🚀 Sumali sa Laro</button>
 
             <div class="info-box">
-                <h3>How to Play</h3>
+                <h3>Paano Maglaro</h3>
                 <ul>
-                    <li>✓ You'll be matched with other players</li>
-                    <li>✓ Numbers are called randomly</li>
-                    <li>✓ Numbers auto-mark on your card!</li>
-                    <li>✓ First to get 5 in a row wins!</li>
-                    <li>✓ Win: 10 points | Runner-up: 5 points</li>
+                    <li>✓ Makaka-match ka sa ibang players</li>
+                    <li>✓ Mga numero ang itataawag randomly</li>
+                    <li>✓ Automatic na mag-mark ang numbers!</li>
+                    <li>✓ Una na makakuha ng 5 in a row manalo!</li>
+                    <li>✓ Nanalo: 10 points | Runner-up: 5 points</li>
                 </ul>
             </div>
         </div>
@@ -456,29 +480,30 @@
         <!-- Game Screen -->
         <div id="gameScreen" class="game-board hidden">
             <div class="game-header">
-                <h2>🎮 Bingo Game</h2>
+                <h2>🎮 Bingo Laro</h2>
                 <div class="current-number">
-                    <h3>📢 Called Number</h3>
+                    <h3>📢 Nakatawag na Numero</h3>
                     <div class="announcer-display">
                         <div class="letter-badge" id="letterBadge">-</div>
                         <div class="number-display" id="currentNumber">-</div>
                     </div>
+                    <div class="joke-text" id="jokeText"></div>
                     <div class="controls">
-                        <button onclick="callNextNumber()" id="callBtn">📢 Call Next Number</button>
-                        <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊 Sound ON</button>
+                        <button onclick="callNextNumber()" id="callBtn">📢 Tawagin ang Susunod</button>
+                        <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊 Tunog ON</button>
                     </div>
                 </div>
             </div>
 
             <div class="game-status">
-                <p>Status: <span id="gameStatus">IN-PROGRESS</span></p>
+                <p>Status: <span id="gameStatus">NAGSISIMULA PA</span></p>
                 <p id="winnerText" class="winner-text hidden"></p>
             </div>
 
             <div class="players-grid" id="playersGrid"></div>
 
             <div class="called-numbers">
-                <h3>📋 Numbers Called (<span id="calledCount">0</span>)</h3>
+                <h3>📋 Mga Numero na Nakatawag (<span id="calledCount">0</span>)</h3>
                 <div class="numbers-list" id="numbersList"></div>
             </div>
         </div>
@@ -494,7 +519,41 @@
         // Initialize game with in-memory storage
         const gameStorage = {};
 
-        // Text-to-Speech announcer
+        // Bisaya Jokes for each letter
+        const bisayaJokes = {
+            'B': [
+                "Baho man ba akong gibat!",
+                "Basag na glass, basag pud ang puso!",
+                "Bag-o man lang ako diri, pero ready na.",
+                "Bili ko, bili mo, bili natin lahat!"
+            ],
+            'I': [
+                "Inyong ilaw ang abot ko!",
+                "Ipon-ipon lang para sa bingo!",
+                "Ikaw na ang malas ko ngayong araw.",
+                "Isang numero lang, kaya yan!"
+            ],
+            'N': [
+                "Naa na ba nay nanalo?",
+                "Numero namin, lucky kami!",
+                "Nindot ang buhay pag nag-bingo!",
+                "Na-excite na ko dito sa laro!"
+            ],
+            'G': [
+                "Galing mo talaga sa bingo!",
+                "Gamit natin ang swerte ngayon!",
+                "Gina-guess ko, numero mo!",
+                "Gigawin natin pang mas exciting!"
+            ],
+            'O': [
+                "Oink oink, bingo na ba?",
+                "Okay na, okay lang yan!",
+                "Oo na, nanalo ka na!",
+                "Omo, malapit na tayong manalo!"
+            ]
+        };
+
+        // Text-to-Speech announcer with Bisaya
         class Announcer {
             static speak(text) {
                 if (!soundEnabled) return;
@@ -506,18 +565,27 @@
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
+                utterance.lang = 'tl-PH'; // Tagalog/Filipino for Bisaya-like pronunciation
 
                 window.speechSynthesis.speak(utterance);
             }
 
-            static announceNumber(letter, number) {
-                const text = `${letter}, ${number}`;
+            static announceNumber(letter, number, joke) {
+                const text = `${letter}, ${number}. ${joke}`;
                 this.speak(text);
+                
+                // Display joke on screen
+                document.getElementById('jokeText').textContent = joke;
             }
 
             static announceBingo(winnerName) {
-                const text = `Bingo! The winner is ${winnerName}!`;
+                const text = `Bingo! Nanalo ang ${winnerName}! Salamat sa pag-laro!`;
                 this.speak(text);
+            }
+
+            static getRandomJoke(letter) {
+                const jokes = bisayaJokes[letter] || ["Swerte mo!"];
+                return jokes[Math.floor(Math.random() * jokes.length)];
             }
         }
 
@@ -526,10 +594,10 @@
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundToggle');
             if (soundEnabled) {
-                btn.textContent = '🔊 Sound ON';
+                btn.textContent = '🔊 Tunog ON';
                 btn.classList.remove('muted');
             } else {
-                btn.textContent = '🔇 Sound OFF';
+                btn.textContent = '🔇 Tunog OFF';
                 btn.classList.add('muted');
             }
         }
@@ -632,7 +700,7 @@
         function startGame() {
             const playerName = document.getElementById('playerName').value.trim();
             if (!playerName) {
-                alert('Please enter your name!');
+                alert('Palihug ibutang ang imong ngalan!');
                 return;
             }
 
@@ -694,9 +762,12 @@
             gameState.calledNumbers.push(nextNumber);
             gameState.currentNumber = nextNumber;
 
-            // Announce the number
+            // Get letter and joke
             const letter = BingoEngine.getLetterForNumber(nextNumber);
-            Announcer.announceNumber(letter, nextNumber);
+            const joke = Announcer.getRandomJoke(letter);
+
+            // Announce the number with joke
+            Announcer.announceNumber(letter, nextNumber, joke);
 
             // Auto-mark the EXACT number on all players' cards
             markNumberOnAllCards(nextNumber);
@@ -740,12 +811,13 @@
             document.getElementById('callBtn').disabled = gameState.status === 'completed';
 
             // Update status
-            document.getElementById('gameStatus').textContent = gameState.status.toUpperCase();
+            const statusText = gameState.status === 'completed' ? 'TAPOS NA' : 'NAGLALARO PA';
+            document.getElementById('gameStatus').textContent = statusText;
 
             // Update winner
             const winnerText = document.getElementById('winnerText');
             if (gameState.winner) {
-                winnerText.textContent = `🏆 Winner: ${gameState.winner.name} earned ${gameState.winner.score} points!`;
+                winnerText.textContent = `🏆 Nanalo: ${gameState.winner.name} kumita ng ${gameState.winner.score} points!`;
                 winnerText.classList.remove('hidden');
             } else {
                 winnerText.classList.add('hidden');
@@ -774,7 +846,7 @@
                             <div 
                                 class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''}"
                             >
-                                ${isFree ? 'FREE' : number}
+                                ${isFree ? 'LIBRE' : number}
                             </div>
                         `;
                     }
@@ -783,7 +855,7 @@
                 html += '</div>';
 
                 if (player.isWinner) {
-                    html += '<div class="winner-badge">🏆 WINNER</div>';
+                    html += '<div class="winner-badge">🏆 NANALO!</div>';
                 }
 
                 playerCard.innerHTML = html;
