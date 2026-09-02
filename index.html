@@ -519,41 +519,36 @@
         // Initialize game with in-memory storage
         const gameStorage = {};
 
-        // Bisaya Jokes for each letter
+        // Bisaya (Cebuano) phrases for each letter — formal/non-slang
         const bisayaJokes = {
             'B': [
-                "Baho man ba akong gibat!",
-                "Basag na glass, basag pud ang puso!",
-                "Bag-o man lang ako diri, pero ready na.",
-                "Bili ko, bili mo, bili natin lahat!"
+                "Maayong swerte kanimo.",
+                "Magmalampuson unta ka.",
+                "Lingaw kaayo ang dula — padayon!"
             ],
             'I': [
-                "Inyong ilaw ang abot ko!",
-                "Ipon-ipon lang para sa bingo!",
-                "Ikaw na ang malas ko ngayong araw.",
-                "Isang numero lang, kaya yan!"
+                "Padayon sa pagdula, maayo ka nga numero.",
+                "Tipigi ang kusog ug paglaum.",
+                "Paninguha lang, makab-ot nimo." 
             ],
             'N': [
-                "Naa na ba nay nanalo?",
-                "Numero namin, lucky kami!",
-                "Nindot ang buhay pag nag-bingo!",
-                "Na-excite na ko dito sa laro!"
+                "Hapit na ang kalampusan — ayaw kawala'g paglaum.",
+                "Malipayong pagdula sa tanan.",
+                "Naa nay mananaug, basin ikaw na." 
             ],
             'G': [
-                "Galing mo talaga sa bingo!",
-                "Gamit natin ang swerte ngayon!",
-                "Gina-guess ko, numero mo!",
-                "Gigawin natin pang mas exciting!"
+                "Gawi ang maayo, mahimo ka’g mananaog.",
+                "Gahi'g loob, padayon lang.",
+                "Gasa sa swerte, padayon sa paglaum." 
             ],
             'O': [
-                "Oink oink, bingo na ba?",
-                "Okay na, okay lang yan!",
-                "Oo na, nanalo ka na!",
-                "Omo, malapit na tayong manalo!"
+                "O, hapit na gyud ang kadaugan.",
+                "Ok ra, padayon lang ug dula.",
+                "O, siguradong lingaw kaayo!" 
             ]
         };
 
-        // Text-to-Speech announcer with Bisaya
+        // Text-to-Speech announcer with Cebuano preference
         class Announcer {
             static speak(text) {
                 if (!soundEnabled) return;
@@ -565,26 +560,37 @@
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
-                utterance.lang = 'tl-PH'; // Tagalog/Filipino for Bisaya-like pronunciation
+
+                // Prefer a Cebuano ('ceb') voice when available; otherwise attempt 'ceb-PH' or fall back to default
+                const voices = window.speechSynthesis.getVoices();
+                const cebVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ceb'));
+                if (cebVoice) {
+                    utterance.voice = cebVoice;
+                    utterance.lang = cebVoice.lang;
+                } else {
+                    // Some browsers may not expose a 'ceb' voice; set lang to Cebuano locale and allow browser fallback
+                    utterance.lang = 'ceb-PH';
+                }
 
                 window.speechSynthesis.speak(utterance);
             }
 
             static announceNumber(letter, number, joke) {
-                const text = `${letter}, ${number}. ${joke}`;
+                // Compose announcement in formal Cebuano
+                const text = `${letter} ${number}. ${joke}`;
                 this.speak(text);
-                
+
                 // Display joke on screen
                 document.getElementById('jokeText').textContent = joke;
             }
 
             static announceBingo(winnerName) {
-                const text = `Bingo! Nanalo ang ${winnerName}! Salamat sa pag-laro!`;
+                const text = `Bingo! Si ${winnerName} ang mananaog! Salamat sa pagdula.`;
                 this.speak(text);
             }
 
             static getRandomJoke(letter) {
-                const jokes = bisayaJokes[letter] || ["Swerte mo!"];
+                const jokes = bisayaJokes[letter] || ["Maayong swerte!"];
                 return jokes[Math.floor(Math.random() * jokes.length)];
             }
         }
