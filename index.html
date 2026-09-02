@@ -548,9 +548,44 @@
             ]
         };
 
-        // Text-to-Speech announcer with Cebuano preference
+        // Text-to-Speech announcer with Cebuano voice loading & fallbacks
         class Announcer {
-            static speak(text) {
+            static getVoices() {
+                // Return available voices if present, otherwise wait for voiceschanged
+                const voices = window.speechSynthesis.getVoices();
+                if (voices && voices.length) return Promise.resolve(voices);
+
+                return new Promise(resolve => {
+                    const handler = () => {
+                        window.speechSynthesis.removeEventListener('voiceschanged', handler);
+                        resolve(window.speechSynthesis.getVoices());
+                    };
+
+                    window.speechSynthesis.addEventListener('voiceschanged', handler);
+
+                    // Fallback timeout in case voiceschanged doesn't fire
+                    setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
+                });
+            }
+
+            static async getPreferredVoice() {
+                const voices = await Announcer.getVoices();
+                if (!voices || !voices.length) return null;
+
+                // Prefer explicit Cebuano voices
+                let find = v => (v.lang || '').toLowerCase().startsWith('ceb') || (v.name || '').toLowerCase().includes('cebu') || (v.lang || '').toLowerCase().includes('bisaya');
+                let voice = voices.find(find);
+                if (voice) return voice;
+
+                // Fallback to Filipino/Tagalog or Philippine English
+                voice = voices.find(v => (v.lang || '').toLowerCase().startsWith('tl') || (v.lang || '').toLowerCase().startsWith('fil') || (v.lang || '').toLowerCase().includes('ph'));
+                if (voice) return voice;
+
+                // Final fallback: any voice
+                return voices[0] || null;
+            }
+
+            static async speak(text) {
                 if (!soundEnabled) return;
 
                 // Cancel any previous speech
@@ -561,14 +596,15 @@
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
 
-                // Prefer a Cebuano ('ceb') voice when available; otherwise attempt 'ceb-PH' or fall back to default
-                const voices = window.speechSynthesis.getVoices();
-                const cebVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ceb'));
-                if (cebVoice) {
-                    utterance.voice = cebVoice;
-                    utterance.lang = cebVoice.lang;
-                } else {
-                    // Some browsers may not expose a 'ceb' voice; set lang to Cebuano locale and allow browser fallback
+                try {
+                    const voice = await Announcer.getPreferredVoice();
+                    if (voice) {
+                        utterance.voice = voice;
+                        utterance.lang = voice.lang || 'ceb-PH';
+                    } else {
+                        utterance.lang = 'ceb-PH';
+                    }
+                } catch (e) {
                     utterance.lang = 'ceb-PH';
                 }
 
@@ -578,7 +614,8 @@
             static announceNumber(letter, number, joke) {
                 // Compose announcement in formal Cebuano
                 const text = `${letter} ${number}. ${joke}`;
-                this.speak(text);
+                // Fire and forget: don't await to avoid blocking
+                Announcer.speak(text);
 
                 // Display joke on screen
                 document.getElementById('jokeText').textContent = joke;
@@ -586,7 +623,7 @@
 
             static announceBingo(winnerName) {
                 const text = `Bingo! Si ${winnerName} ang mananaog! Salamat sa pagdula.`;
-                this.speak(text);
+                Announcer.speak(text);
             }
 
             static getRandomJoke(letter) {
@@ -607,6 +644,8 @@
                 btn.classList.add('muted');
             }
         }
+
+        // ... rest of the file remains unchanged (BingoEngine, BotPlayer, game logic) ...
 
         // BingoEngine
         class BingoEngine {
