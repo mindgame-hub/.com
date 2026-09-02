@@ -519,51 +519,20 @@
         // Initialize game with in-memory storage
         const gameStorage = {};
 
-        // Bisaya (Cebuano) phrases for each letter — formal/non-slang
-        const bisayaJokes = {
-            'B': [
-                "Maayong swerte kanimo.",
-                "Magmalampuson unta ka.",
-                "Lingaw kaayo ang dula — padayon!"
-            ],
-            'I': [
-                "Padayon sa pagdula, maayo ka nga numero.",
-                "Tipigi ang kusog ug paglaum.",
-                "Paninguha lang, makab-ot nimo." 
-            ],
-            'N': [
-                "Hapit na ang kalampusan — ayaw kawala'g paglaum.",
-                "Malipayong pagdula sa tanan.",
-                "Naa nay mananaug, basin ikaw na." 
-            ],
-            'G': [
-                "Gawi ang maayo, mahimo ka’g mananaog.",
-                "Gahi'g loob, padayon lang.",
-                "Gasa sa swerte, padayon sa paglaum." 
-            ],
-            'O': [
-                "O, hapit na gyud ang kadaugan.",
-                "Ok ra, padayon lang ug dula.",
-                "O, siguradong lingaw kaayo!" 
-            ]
-        };
+        // Keep jokes blank since we will speak in English without jokes
+        const bisayaJokes = {};
 
-        // Text-to-Speech announcer with Cebuano voice loading & fallbacks
+        // Text-to-Speech announcer with English preference and shake sound
         class Announcer {
             static getVoices() {
-                // Return available voices if present, otherwise wait for voiceschanged
                 const voices = window.speechSynthesis.getVoices();
                 if (voices && voices.length) return Promise.resolve(voices);
-
                 return new Promise(resolve => {
                     const handler = () => {
                         window.speechSynthesis.removeEventListener('voiceschanged', handler);
                         resolve(window.speechSynthesis.getVoices());
                     };
-
                     window.speechSynthesis.addEventListener('voiceschanged', handler);
-
-                    // Fallback timeout in case voiceschanged doesn't fire
                     setTimeout(() => resolve(window.speechSynthesis.getVoices()), 1000);
                 });
             }
@@ -572,64 +541,100 @@
                 const voices = await Announcer.getVoices();
                 if (!voices || !voices.length) return null;
 
-                // Prefer explicit Cebuano voices
-                let find = v => (v.lang || '').toLowerCase().startsWith('ceb') || (v.name || '').toLowerCase().includes('cebu') || (v.lang || '').toLowerCase().includes('bisaya');
+                // Prefer English voices
+                let find = v => (v.lang || '').toLowerCase().startsWith('en') || (v.name || '').toLowerCase().includes('english');
                 let voice = voices.find(find);
                 if (voice) return voice;
 
-                // Fallback to Filipino/Tagalog or Philippine English
-                voice = voices.find(v => (v.lang || '').toLowerCase().startsWith('tl') || (v.lang || '').toLowerCase().startsWith('fil') || (v.lang || '').toLowerCase().includes('ph'));
+                // Fallback to any voice with 'ph' or 'fil' hints
+                voice = voices.find(v => (v.lang || '').toLowerCase().includes('ph') || (v.lang || '').toLowerCase().includes('fil') || (v.lang || '').toLowerCase().startsWith('tl'));
                 if (voice) return voice;
 
-                // Final fallback: any voice
                 return voices[0] || null;
             }
 
             static async speak(text) {
                 if (!soundEnabled) return;
-
-                // Cancel any previous speech
                 window.speechSynthesis.cancel();
-
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
                 utterance.volume = 1.0;
-
                 try {
                     const voice = await Announcer.getPreferredVoice();
                     if (voice) {
                         utterance.voice = voice;
-                        utterance.lang = voice.lang || 'ceb-PH';
+                        utterance.lang = voice.lang || 'en-US';
                     } else {
-                        utterance.lang = 'ceb-PH';
+                        utterance.lang = 'en-US';
                     }
                 } catch (e) {
-                    utterance.lang = 'ceb-PH';
+                    utterance.lang = 'en-US';
                 }
-
                 window.speechSynthesis.speak(utterance);
             }
 
-            static announceNumber(letter, number, joke) {
-                // Compose announcement in formal Cebuano
-                const text = `${letter} ${number}. ${joke}`;
-                // Fire and forget: don't await to avoid blocking
-                Announcer.speak(text);
+            // Short percussive "shake" using WebAudio (no external file needed)
+            static playShakeSound(duration = 350) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return Promise.resolve();
+                const ctx = new AudioCtx();
+                const sampleRate = ctx.sampleRate;
+                const bufferSize = Math.floor(sampleRate * (duration / 1000));
+                const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
+                const data = buffer.getChannelData(0);
 
-                // Display joke on screen
-                document.getElementById('jokeText').textContent = joke;
+                // Fill with decaying white noise to simulate a short "shake/rumble"
+                for (let i = 0; i < bufferSize; i++) {
+                    const decay = Math.exp(-3 * i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1) * decay * 0.6;
+                }
+
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                const bandpass = ctx.createBiquadFilter();
+                bandpass.type = 'bandpass';
+                bandpass.frequency.value = 200; // emphasize low-mid rumble
+                bandpass.Q.value = 0.8;
+
+                const gain = ctx.createGain();
+                gain.gain.value = 0.8;
+
+                source.connect(bandpass);
+                bandpass.connect(gain);
+                gain.connect(ctx.destination);
+
+                source.start(0);
+                return new Promise(resolve => {
+                    source.onended = () => {
+                        try { ctx.close(); } catch (e) {}
+                        resolve();
+                    };
+                });
+            }
+
+            static async announceNumber(letter, number) {
+                // Play shake sound, then announce in English without jokes
+                try {
+                    await Announcer.playShakeSound(350);
+                } catch (e) {
+                    // ignore audio errors
+                }
+
+                const text = `${letter} ${number}`;
+                // Clear any displayed joke text
+                const jt = document.getElementById('jokeText');
+                if (jt) jt.textContent = '';
+
+                Announcer.speak(text);
             }
 
             static announceBingo(winnerName) {
-                const text = `Bingo! Si ${winnerName} ang mananaog! Salamat sa pagdula.`;
+                const text = `Bingo! The winner is ${winnerName}. Thanks for playing!`;
                 Announcer.speak(text);
             }
 
-            static getRandomJoke(letter) {
-                const jokes = bisayaJokes[letter] || ["Maayong swerte!"];
-                return jokes[Math.floor(Math.random() * jokes.length)];
-            }
+            static getRandomJoke() { return ''; }
         }
 
         // Toggle sound
@@ -637,15 +642,13 @@
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundToggle');
             if (soundEnabled) {
-                btn.textContent = '🔊 Tunog ON';
+                btn.textContent = '🔊 Sound ON';
                 btn.classList.remove('muted');
             } else {
-                btn.textContent = '🔇 Tunog OFF';
+                btn.textContent = '🔇 Sound OFF';
                 btn.classList.add('muted');
             }
         }
-
-        // ... rest of the file remains unchanged (BingoEngine, BotPlayer, game logic) ...
 
         // BingoEngine
         class BingoEngine {
@@ -745,7 +748,7 @@
         function startGame() {
             const playerName = document.getElementById('playerName').value.trim();
             if (!playerName) {
-                alert('Palihug ibutang ang imong ngalan!');
+                alert('Please enter your name!');
                 return;
             }
 
@@ -807,12 +810,11 @@
             gameState.calledNumbers.push(nextNumber);
             gameState.currentNumber = nextNumber;
 
-            // Get letter and joke
+            // Get letter
             const letter = BingoEngine.getLetterForNumber(nextNumber);
-            const joke = Announcer.getRandomJoke(letter);
 
-            // Announce the number with joke
-            Announcer.announceNumber(letter, nextNumber, joke);
+            // Announce the number (plays shake then speaks)
+            Announcer.announceNumber(letter, nextNumber);
 
             // Auto-mark the EXACT number on all players' cards
             markNumberOnAllCards(nextNumber);
@@ -856,13 +858,13 @@
             document.getElementById('callBtn').disabled = gameState.status === 'completed';
 
             // Update status
-            const statusText = gameState.status === 'completed' ? 'TAPOS NA' : 'NAGLALARO PA';
+            const statusText = gameState.status === 'completed' ? 'FINISHED' : 'IN PROGRESS';
             document.getElementById('gameStatus').textContent = statusText;
 
             // Update winner
             const winnerText = document.getElementById('winnerText');
             if (gameState.winner) {
-                winnerText.textContent = `🏆 Nanalo: ${gameState.winner.name} kumita ng ${gameState.winner.score} points!`;
+                winnerText.textContent = `🏆 Winner: ${gameState.winner.name} earned ${gameState.winner.score} points!`;
                 winnerText.classList.remove('hidden');
             } else {
                 winnerText.classList.add('hidden');
@@ -891,7 +893,7 @@
                             <div 
                                 class="bingo-cell ${marked ? 'marked' : ''} ${isFree ? 'free' : ''}"
                             >
-                                ${isFree ? 'LIBRE' : number}
+                                ${isFree ? 'FREE' : number}
                             </div>
                         `;
                     }
@@ -900,7 +902,7 @@
                 html += '</div>';
 
                 if (player.isWinner) {
-                    html += '<div class="winner-badge">🏆 NANALO!</div>';
+                    html += '<div class="winner-badge">🏆 WINNER!</div>';
                 }
 
                 playerCard.innerHTML = html;
