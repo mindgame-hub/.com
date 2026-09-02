@@ -189,28 +189,7 @@
             animation: popIn 0.3s ease-out;
         }
 
-        .joke-text {
-            background: rgba(255, 255, 255, 0.0);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-style: italic;
-            max-width: 300px;
-            text-align: center;
-            animation: slideIn 0.5s ease-out;
-        }
-
-        @keyframes slideIn {
-            0% {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        .joke-text { display:none; }
 
         .controls {
             display: flex;
@@ -358,11 +337,7 @@
             animation: markAnimation 0.3s ease-out;
         }
 
-        @keyframes markAnimation {
-            0% { transform: scale(0.9); }
-            100% { transform: scale(1); }
-        }
-
+        @keyframes markAnimation { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
         .bingo-cell.free { background: #ffc107; font-weight: bold; }
         .bingo-cell.not-called { cursor: not-allowed; opacity: 0.6; }
         .bingo-cell.not-called:hover { background: white; }
@@ -470,6 +445,23 @@
         // Keep jokes blank since we will speak in English without jokes
         const bisayaJokes = {};
 
+        // Ensure and resume a shared AudioContext on user gesture
+        function ensureAudio() {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return null;
+            if (!window._bingoAudioCtx) {
+                try {
+                    window._bingoAudioCtx = new AudioCtx();
+                } catch (e) {
+                    window._bingoAudioCtx = null;
+                }
+            }
+            if (window._bingoAudioCtx && window._bingoAudioCtx.state === 'suspended') {
+                window._bingoAudioCtx.resume().catch(() => {});
+            }
+            return window._bingoAudioCtx;
+        }
+
         // Text-to-Speech announcer with English preference and shake sound
         class Announcer {
             static getVoices() {
@@ -519,11 +511,11 @@
                 window.speechSynthesis.speak(utterance);
             }
 
-            // Short percussive "shake" using WebAudio (no external file needed)
+            // Short percussive "shake" using shared WebAudio context
             static playShakeSound(duration = 350) {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return Promise.resolve();
-                const ctx = new AudioCtx();
+                const ctx = ensureAudio();
+                if (!ctx) return Promise.resolve();
+
                 const sampleRate = ctx.sampleRate;
                 const bufferSize = Math.floor(sampleRate * (duration / 1000));
                 const buffer = ctx.createBuffer(1, bufferSize, sampleRate);
@@ -552,7 +544,6 @@
                 source.start(0);
                 return new Promise(resolve => {
                     source.onended = () => {
-                        try { ctx.close(); } catch (e) {}
                         resolve();
                     };
                 });
@@ -589,6 +580,7 @@
             if (soundEnabled) {
                 btn.textContent = '🔊 Sound ON';
                 btn.classList.remove('muted');
+                ensureAudio();
             } else {
                 btn.textContent = '🔇 Sound OFF';
                 btn.classList.add('muted');
@@ -710,6 +702,11 @@
         // Start Game / Join Room
         function startGame() {
             const playerName = document.getElementById('playerName').value.trim();
+
+            // ensure audio context is created/resumed on user gesture
+            ensureAudio();
+            // preload voices
+            Announcer.getVoices().then(()=>{}).catch(()=>{});
 
             if (!gameState) {
                 gameState = createInitialRoom();
