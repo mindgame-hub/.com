@@ -13,21 +13,23 @@
         .form-group { display:flex; gap:10px; align-items:center; margin:12px 0; }
         input[type=text], input[type=number] { padding:10px; border:2px solid #e0e0e0; border-radius:6px; }
         .btn { padding:10px 14px; font-weight:bold; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:white; border:none; border-radius:6px; cursor:pointer; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .rooms { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
         .room-card { border:1px solid #ddd; padding:12px; border-radius:8px; min-width:220px; }
         .players-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-top:12px; }
         @media (max-width:900px){ .players-grid{grid-template-columns:repeat(2,1fr);} }
         @media (max-width:600px){ .players-grid{grid-template-columns:1fr;} }
         .player-card{ border:2px solid #ddd; border-radius:8px; padding:10px; background:white; position:relative; min-height:120px; }
+        .player-card.current { border-color: #667eea; background: #f0f7ff; }
         .current-number{ background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); padding:16px; border-radius:8px; color:white; }
-        .controls{ display:flex; gap:10px; margin-top:10px; }
+        .controls{ display:flex; gap:10px; margin-top:10px; flex-wrap: wrap; }
         .called-numbers{ margin-top:12px; padding:12px; background:#f5f5f5; border-radius:8px; }
         .number-badge{ background:#2196f3; color:white; padding:5px 8px; border-radius:4px; margin-right:6px; display:inline-block; }
         .status { margin-top:8px; font-size:13px; color:#333; }
         .audio-status { margin-left:10px; font-weight:bold; }
         .hidden{ display:none; }
         .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
-        .bingo-cell { background: #f0f0f0; border: 1px solid #ccc; }
+        .bingo-cell { background: #f0f0f0; border: 1px solid #ccc; padding: 6px; text-align: center; font-size: 12px; }
         .bingo-cell.marked { background: #4CAF50; color: white; font-weight: bold; }
         .bingo-cell.free { background: #FFD700; font-weight: bold; }
         .winner-badge { background: gold; color: red; padding: 8px; border-radius: 4px; margin-top: 8px; font-weight: bold; text-align: center; }
@@ -88,9 +90,9 @@
                         <div class="controls">
                             <button id="callBtn" class="btn" onclick="callNextNumber()">📢 Call Next</button>
                             <button id="soundToggle" class="btn" onclick="toggleSound()">🔊 Sound ON</button>
-                            <button id="startBtn" class="btn hidden" onclick="startSelectedRoom()">▶️ Start Game</button>
+                            <button id="startBtn" class="btn" onclick="startSelectedRoom()">▶️ Start Game</button>
                         </div>
-                        <div class="status"><span id="roomStatus">Status: -</span></div>
+                        <div class="status"><span id="roomStatus">Status: -</span><br><span id="ownerStatus" style="font-size:12px; color:#666;"></span></div>
                     </div>
 
                     <div class="called-numbers">
@@ -221,10 +223,25 @@
         // Rendering room/game screen
         function renderRoom(){
             const room = findRoom(currentRoomId); if(!room) return;
+            const isOwner = room.ownerId === currentPlayerId;
+            const isWaiting = room.status === 'waiting';
+            
             document.getElementById('roomTitle').textContent = room.name + (room.ownerName?(' — Owner: '+room.ownerName):'');
             document.getElementById('roomStatus').textContent = 'Status: '+room.status.toUpperCase();
+            document.getElementById('ownerStatus').textContent = isOwner ? '👑 You are the room owner' : '';
             document.getElementById('currentNumber').textContent = room.currentNumber || '-';
             document.getElementById('letterBadge').textContent = room.currentNumber ? BingoEngine.getLetterForNumber(room.currentNumber) : '-';
+            
+            // Show start button only if owner AND game waiting
+            const startBtn = document.getElementById('startBtn');
+            if (isOwner && isWaiting) {
+                startBtn.classList.remove('hidden');
+                startBtn.disabled = false;
+            } else {
+                startBtn.classList.add('hidden');
+                startBtn.disabled = true;
+            }
+            
             document.getElementById('callBtn').disabled = room.status !== 'in-progress';
             document.getElementById('calledCount').textContent = room.calledNumbers.length;
             document.getElementById('numbersList').innerHTML = room.calledNumbers.map(n=>`<span class="number-badge">${BingoEngine.getLetterForNumber(n)} ${n}</span>`).join(' ');
@@ -236,7 +253,7 @@
                 for (let r=0;r<5;r++){
                     for (let c=0;c<5;c++){
                         const number = p.card[c][r]; const marked = p.marked[r][c]; const isFree = number===0;
-                        html += `<div class="bingo-cell ${marked? 'marked':''} ${isFree? 'free':''}" style="padding:6px; text-align:center;">${isFree?'FREE':number}</div>`;
+                        html += `<div class="bingo-cell ${marked? 'marked':''} ${isFree? 'free':''}">${isFree?'FREE':number}</div>`;
                     }
                 }
                 html += '</div>';
